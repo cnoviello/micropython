@@ -56,7 +56,7 @@ ifeq ($(DEBUG), 1)
 CFLAGS += -g -DPENDSV_DEBUG
 COPT = -O0
 else
-CFLAGS += -fdata-sections -ffunction-sections
+CFLAGS += -g -fdata-sections -ffunction-sections
 COPT += -Os -DNDEBUG
 LDFLAGS += --gc-sections
 endif
