@@ -37,8 +37,7 @@
 #define PF_FLAG_PAD_AFTER_SIGN    (0x040)
 #define PF_FLAG_CENTER_ADJUST     (0x080)
 #define PF_FLAG_ADD_PERCENT       (0x100)
-#define PF_FLAG_PAD_NAN_INF       (0x200)
-#define PF_FLAG_SHOW_OCTAL_LETTER (0x400)
+#define PF_FLAG_SHOW_OCTAL_LETTER (0x200)
 
 typedef void (*mp_print_strn_t)(void *data, const char *str, mp_uint_t len);
 
@@ -57,7 +56,6 @@ extern const mp_print_t mp_sys_stdout_print;
 
 int mp_print_str(const mp_print_t *print, const char *str);
 int mp_print_strn(const mp_print_t *print, const char *str, mp_uint_t len, int flags, char fill, int width);
-int mp_print_int(const mp_print_t *print, mp_uint_t x, int sgn, int base, int base_char, int flags, char fill, int width);
 #if MICROPY_PY_BUILTINS_FLOAT
 int mp_print_float(const mp_print_t *print, mp_float_t f, char fmt, int flags, char fill, int width, int prec);
 #endif
