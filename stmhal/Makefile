@@ -54,9 +54,9 @@ LIBS =
 # Debugging/Optimization
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -DPENDSV_DEBUG
-COPT = -O0
+COPT = -O1
 else
-CFLAGS += -g -fdata-sections -ffunction-sections
+CFLAGS += -fdata-sections -ffunction-sections
 COPT += -Os -DNDEBUG
 LDFLAGS += --gc-sections
 endif
