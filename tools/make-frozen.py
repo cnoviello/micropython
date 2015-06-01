@@ -26,10 +26,16 @@ def module_name(f):
 
 modules = []
 
-for dirpath, dirnames, filenames in os.walk(sys.argv[1]):
+root = sys.argv[1]
+root_len = len(root)
+if root[-1] != "/":
+    root_len += 1
+
+for dirpath, dirnames, filenames in os.walk(root):
     for f in filenames:
-        st = os.stat(dirpath + "/" + f)
-        modules.append((f, st))
+        fullpath = dirpath + "/" + f
+        st = os.stat(fullpath)
+        modules.append((fullpath[root_len:], st))
 
 print("#include <stdint.h>")
 print("const uint16_t mp_frozen_sizes[] = {")
@@ -43,8 +49,8 @@ print("const char mp_frozen_content[] = {")
 for f, st in modules:
     m = module_name(f)
     print('"%s\\0"' % m)
-    data = open(sys.argv[1] + "/" + f).read()
-    data = repr(data)[1:-1]
+    data = open(sys.argv[1] + "/" + f, "rb").read()
+    data = repr(data)[2:-1]
     data = data.replace('"', '\\"')
     print('"%s"' % data)
 print("};")
