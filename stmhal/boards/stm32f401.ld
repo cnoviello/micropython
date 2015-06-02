@@ -7,7 +7,7 @@
 MEMORY
 {
     FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 0x080000 /* entire flash, 512 KiB */
-    FLASH_ISR (rx)  : ORIGIN = 0x08000000, LENGTH = 0x008000 /* sector 0, 16 KiB */
+    FLASH_ISR (rx)  : ORIGIN = 0x08000000, LENGTH = 0x008000 /* sector 0,1  2x16 KiB */
     FLASH_TEXT (rx) : ORIGIN = 0x08020000, LENGTH = 0x080000 /* sectors 5,6,7,8, 4*128KiB = 512 KiB */
     RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 0x018000 /* 96 KiB */
 }
