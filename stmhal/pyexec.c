@@ -285,10 +285,10 @@ int pyexec_event_repl_process_char(int c) {
 
 #else // MICROPY_REPL_EVENT_DRIVEN
 
-
 int pyexec_file_upload(void) {
-    vstr_t line;
-    vstr_init(&line, 32);
+    vstr_t fpath, fname;
+    vstr_init(&fpath, 32);
+    vstr_init(&fname, 10);
     FIL fp;
     UINT n;
 
@@ -296,44 +296,71 @@ int pyexec_file_upload(void) {
 
 upload_file_reset:
 
-	mp_hal_stdout_tx_str("Write file name with full path\r\n");
+	mp_hal_stdout_tx_str("Write file name followed by CTRL+A\r\n");
 
-	vstr_reset(&line);
+	vstr_reset(&fpath);
+	vstr_reset(&fname);
+	vstr_add_str(&fpath, "/flash/");
 
     for (;;) {
         int c = mp_hal_stdin_rx_chr();
         if (c == CHAR_CTRL_A) {
 			//File name completed
-			mp_hal_stdout_tx_str("Filename is: ");
-			mp_hal_stdout_tx_str(vstr_str(&line));
-			mp_hal_stdout_tx_str("\r\n");
-			break;
+			if(vstr_len(&fname) == 0)
+				goto upload_file_reset;
+			if(vstr_str(&fname)[0] == '-') { //Delete file
+				vstr_add_str(&fpath, vstr_null_terminated_str(&fname) + 1);
+				mp_hal_stdout_tx_str("Deleting: ");
+				mp_hal_stdout_tx_str(vstr_null_terminated_str(&fpath));
+				mp_hal_stdout_tx_str("\r\n");
+				f_unlink(vstr_null_terminated_str(&fpath));
+				goto upload_file_reset;
+			} else {
+				vstr_add_str(&fpath, vstr_null_terminated_str(&fname));
+				mp_hal_stdout_tx_str("Filename is: ");
+				mp_hal_stdout_tx_str(vstr_null_terminated_str(&fpath));
+				mp_hal_stdout_tx_str("\r\n");
+				break;
+			}
 		} if (c == CHAR_CTRL_C) {
 			//Force exiting from file uploa mode
 			pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
+			vstr_clear(&fpath);
+			vstr_clear(&fname);
 			return 1;
 		} else
-			vstr_add_char(&line, c);
+			vstr_add_char(&fname, c);
     }
 
-    f_open(&fp, vstr_str(&line), FA_WRITE | FA_CREATE_ALWAYS);
+    f_open(&fp, vstr_null_terminated_str(&fpath), FA_WRITE | FA_CREATE_ALWAYS);
 
+	mp_hal_stdout_tx_str("Write file content followed by CTRL+A\r\n");
+	
+	uint counter = 0;
+	
     for (;;) {
         int c = mp_hal_stdin_rx_chr();
+		counter++;
         if (c == CHAR_CTRL_A) {
             // File content completed
 		    f_close(&fp);
 			mp_hal_stdout_tx_str("Finished uploading ");
-			mp_hal_stdout_tx_str(vstr_str(&line));
+			mp_hal_stdout_tx_str(vstr_null_terminated_str(&fpath));
 			mp_hal_stdout_tx_str("\r\n");			
+			mp_hal_stdout_tx_str("Transferred:  ");
+			vstr_reset(&fpath);
+			vstr_printf(&fpath, "%d", counter);
+			mp_hal_stdout_tx_str(vstr_null_terminated_str(&fpath));
+			mp_hal_stdout_tx_str("\r\n");						
 			goto upload_file_reset;
 		} if (c == CHAR_CTRL_C) {
 			//Force exiting from file uploa mode			
 			pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
+			vstr_clear(&fpath);
+			vstr_clear(&fname);
 			return 1;
-		} else
+		} else 
 		    f_write(&fp, &c, sizeof(char), &n);
-	
     }
 }
 

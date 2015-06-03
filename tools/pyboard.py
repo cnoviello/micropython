@@ -141,6 +141,32 @@ class Pyboard:
     def get_time(self):
         t = str(self.eval('pyb.RTC().datetime()'), encoding='utf8')[1:-1].split(', ')
         return int(t[4]) * 3600 + int(t[5]) * 60 + int(t[6])
+        
+    def enter_file_upload_mode(self):
+        self.serial.write(bytes(chr(6), 'ascii')) #Sends CTRL-F to put board in file transfer mode
+        time.sleep(1)
+
+    def exit_file_upload_mode(self):
+        self.serial.write(bytes(chr(3), 'ascii')) #Sends CTRL-C to exit from file transfer mode
+        time.sleep(1)
+
+    def delete_file(self, filename):
+        self.serial.write(bytes("-" + filename, 'utf8')) #Sends filename
+        time.sleep(1)        
+        print("Deleted %s" % filename)
+                
+    def send_file(self, filename):
+        self.serial.write(bytes(filename, 'utf8')) #Sends filename
+        time.sleep(1)        
+        self.serial.write(bytes(chr(1), 'ascii')) #Sends CTRL-A again before transferring file content
+        counter = 0
+        for c in open(filename).read():
+            self.serial.write(bytes(c, 'utf8')) #Sends filename
+            time.sleep(0.1) #This value was derived doing experiments. 
+            counter+=1
+            print('Transferred %d bytes\r'%counter, end="")
+        self.serial.write(bytes(chr(1), 'ascii')) #Sends CTRL-A to commit file content        
+        print("Transferred %d bytes" % counter)
 
 def execfile(filename, device='/dev/ttyACM0'):
     pyb = Pyboard(device)
@@ -209,14 +235,34 @@ def run_test(device):
 def main():
     import argparse
     cmd_parser = argparse.ArgumentParser(description='Run scripts on the pyboard.')
+    cmd_parser.add_argument('--delete', action='store_true', help='delete the given file on the pyboard')
     cmd_parser.add_argument('--device', default='/dev/ttyACM0', help='the serial device of the pyboard')
     cmd_parser.add_argument('--follow', action='store_true', help='follow the output after running the scripts [default if no scripts given]')
+    cmd_parser.add_argument('--send', action='store_true', help='send file to pyboard flash')
     cmd_parser.add_argument('--test', action='store_true', help='run a small test suite on the pyboard')
     cmd_parser.add_argument('files', nargs='*', help='input files')
     args = cmd_parser.parse_args()
 
     if args.test:
         run_test(device=args.device)
+
+    if args.delete:
+        pyb = Pyboard(args.device)
+        pyb.enter_file_upload_mode()
+        for filename in args.files:
+            print("Deleting %s ..." % filename)
+            pyb.delete_file(filename)
+        pyb.exit_file_upload_mode()
+        sys.exit(1)
+
+    if args.send:
+        pyb = Pyboard(args.device)
+        pyb.enter_file_upload_mode()
+        for filename in args.files:
+            print("Transferring %s ..." % filename)
+            pyb.send_file(filename)
+        pyb.exit_file_upload_mode()
+        sys.exit(1)
 
     for filename in args.files:
         try:
