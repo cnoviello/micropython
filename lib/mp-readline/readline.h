@@ -29,6 +29,7 @@
 #define CHAR_CTRL_C (3)
 #define CHAR_CTRL_D (4)
 #define CHAR_CTRL_E (5)
+#define CHAR_CTRL_F (6)
 
 void readline_init0(void);
 int readline(vstr_t *line, const char *prompt);

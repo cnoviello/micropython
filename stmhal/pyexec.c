@@ -37,6 +37,7 @@
 #include MICROPY_HAL_H
 #endif
 #if defined(USE_DEVICE_MODE)
+#include "lib/fatfs/ff.h"
 #include "irq.h"
 #include "usb.h"
 #endif
@@ -218,7 +219,7 @@ STATIC int pyexec_friendly_repl_process_char(int c) {
             mp_hal_stdout_tx_str("\r\n");
             vstr_clear(&repl.line);
             return PYEXEC_FORCED_EXIT;
-        }
+		}
 
         if (ret < 0) {
             return 0;
@@ -283,6 +284,58 @@ int pyexec_event_repl_process_char(int c) {
 }
 
 #else // MICROPY_REPL_EVENT_DRIVEN
+
+
+int pyexec_file_upload(void) {
+    vstr_t line;
+    vstr_init(&line, 32);
+    FIL fp;
+    UINT n;
+
+    mp_hal_stdout_tx_str("Entering file upload mode\r\n");
+
+upload_file_reset:
+
+	mp_hal_stdout_tx_str("Write file name with full path\r\n");
+
+	vstr_reset(&line);
+
+    for (;;) {
+        int c = mp_hal_stdin_rx_chr();
+        if (c == CHAR_CTRL_A) {
+			//File name completed
+			mp_hal_stdout_tx_str("Filename is: ");
+			mp_hal_stdout_tx_str(vstr_str(&line));
+			mp_hal_stdout_tx_str("\r\n");
+			break;
+		} if (c == CHAR_CTRL_C) {
+			//Force exiting from file uploa mode
+			pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
+			return 1;
+		} else
+			vstr_add_char(&line, c);
+    }
+
+    f_open(&fp, vstr_str(&line), FA_WRITE | FA_CREATE_ALWAYS);
+
+    for (;;) {
+        int c = mp_hal_stdin_rx_chr();
+        if (c == CHAR_CTRL_A) {
+            // File content completed
+		    f_close(&fp);
+			mp_hal_stdout_tx_str("Finished uploading ");
+			mp_hal_stdout_tx_str(vstr_str(&line));
+			mp_hal_stdout_tx_str("\r\n");			
+			goto upload_file_reset;
+		} if (c == CHAR_CTRL_C) {
+			//Force exiting from file uploa mode			
+			pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
+			return 1;
+		} else
+		    f_write(&fp, &c, sizeof(char), &n);
+	
+    }
+}
 
 int pyexec_raw_repl(void) {
     vstr_t line;
@@ -409,6 +462,12 @@ friendly_repl_reset:
             mp_hal_stdout_tx_str("\r\n");
             vstr_clear(&line);
             return PYEXEC_FORCED_EXIT;
+	    } else if (ret == CHAR_CTRL_F) {
+	        // file upload
+			mp_hal_stdout_tx_str("File upload\r\n");
+            vstr_clear(&line);
+			pyexec_mode_kind = PYEXEC_MODE_FILE_UPLOAD;
+			return 0;
         } else if (vstr_len(&line) == 0) {
             continue;
         }

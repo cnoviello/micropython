@@ -27,6 +27,7 @@
 typedef enum {
     PYEXEC_MODE_RAW_REPL,
     PYEXEC_MODE_FRIENDLY_REPL,
+	PYEXEC_MODE_FILE_UPLOAD
 } pyexec_mode_kind_t;
 
 extern pyexec_mode_kind_t pyexec_mode_kind;
@@ -34,6 +35,7 @@ extern pyexec_mode_kind_t pyexec_mode_kind;
 #define PYEXEC_FORCED_EXIT (0x100)
 #define PYEXEC_SWITCH_MODE (0x200)
 
+int pyexec_file_upload(void);
 int pyexec_raw_repl(void);
 int pyexec_friendly_repl(void);
 int pyexec_file(const char *filename);

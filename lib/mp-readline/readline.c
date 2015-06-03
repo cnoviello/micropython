@@ -117,6 +117,9 @@ int readline_process_char(int c) {
         } else if (c == CHAR_CTRL_E) {
             // CTRL-E is go-to-end-of-line
             goto end_key;
+        } else if (c == CHAR_CTRL_F) {
+            // CTRL-F 
+            return c;
         } else if (c == '\r') {
             // newline
             mp_hal_stdout_tx_str("\r\n");

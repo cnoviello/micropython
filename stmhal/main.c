@@ -133,7 +133,7 @@ static const char fresh_boot_py[] =
 ;
 
 static const char fresh_main_py[] =
-"# main.py -- put your code here!\r\n"
+"# main.py -- put your code here!\n"
 ;
 
 static const char fresh_pybcdc_inf[] =
@@ -529,7 +529,12 @@ soft_reset:
             if (pyexec_raw_repl() != 0) {
                 break;
             }
-        } else {
+        } else if (pyexec_mode_kind == PYEXEC_MODE_FILE_UPLOAD) {
+			if (pyexec_file_upload() != 0) {
+				break;
+			}
+			
+		} else {
             if (pyexec_friendly_repl() != 0) {
                 break;
             }
