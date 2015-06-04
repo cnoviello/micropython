@@ -146,6 +146,7 @@
 #define ASM_AND_REG_REG(as, reg_dest, reg_src) asm_x64_and_r64_r64((as), (reg_dest), (reg_src))
 #define ASM_ADD_REG_REG(as, reg_dest, reg_src) asm_x64_add_r64_r64((as), (reg_dest), (reg_src))
 #define ASM_SUB_REG_REG(as, reg_dest, reg_src) asm_x64_sub_r64_r64((as), (reg_dest), (reg_src))
+#define ASM_MUL_REG_REG(as, reg_dest, reg_src) asm_x64_mul_r64_r64((as), (reg_dest), (reg_src))
 
 #define ASM_LOAD_REG_REG(as, reg_dest, reg_base) asm_x64_mov_mem64_to_r64((as), (reg_base), 0, (reg_dest))
 #define ASM_LOAD_REG_REG_OFFSET(as, reg_dest, reg_base, word_offset) asm_x64_mov_mem64_to_r64((as), (reg_base), 8 * (word_offset), (reg_dest))
@@ -290,6 +291,7 @@ STATIC byte mp_f_n_args[MP_F_NUMBER_OF] = {
 #define ASM_AND_REG_REG(as, reg_dest, reg_src) asm_x86_and_r32_r32((as), (reg_dest), (reg_src))
 #define ASM_ADD_REG_REG(as, reg_dest, reg_src) asm_x86_add_r32_r32((as), (reg_dest), (reg_src))
 #define ASM_SUB_REG_REG(as, reg_dest, reg_src) asm_x86_sub_r32_r32((as), (reg_dest), (reg_src))
+#define ASM_MUL_REG_REG(as, reg_dest, reg_src) asm_x86_mul_r32_r32((as), (reg_dest), (reg_src))
 
 #define ASM_LOAD_REG_REG(as, reg_dest, reg_base) asm_x86_mov_mem32_to_r32((as), (reg_base), 0, (reg_dest))
 #define ASM_LOAD_REG_REG_OFFSET(as, reg_dest, reg_base, word_offset) asm_x86_mov_mem32_to_r32((as), (reg_base), 4 * (word_offset), (reg_dest))
@@ -382,6 +384,7 @@ STATIC byte mp_f_n_args[MP_F_NUMBER_OF] = {
 #define ASM_AND_REG_REG(as, reg_dest, reg_src) asm_thumb_format_4((as), ASM_THUMB_FORMAT_4_AND, (reg_dest), (reg_src))
 #define ASM_ADD_REG_REG(as, reg_dest, reg_src) asm_thumb_add_rlo_rlo_rlo((as), (reg_dest), (reg_dest), (reg_src))
 #define ASM_SUB_REG_REG(as, reg_dest, reg_src) asm_thumb_sub_rlo_rlo_rlo((as), (reg_dest), (reg_dest), (reg_src))
+#define ASM_MUL_REG_REG(as, reg_dest, reg_src) asm_thumb_format_4((as), ASM_THUMB_FORMAT_4_MUL, (reg_dest), (reg_src))
 
 #define ASM_LOAD_REG_REG(as, reg_dest, reg_base) asm_thumb_ldr_rlo_rlo_i5((as), (reg_dest), (reg_base), 0)
 #define ASM_LOAD_REG_REG_OFFSET(as, reg_dest, reg_base, word_offset) asm_thumb_ldr_rlo_rlo_i5((as), (reg_dest), (reg_base), (word_offset))
@@ -473,6 +476,7 @@ STATIC byte mp_f_n_args[MP_F_NUMBER_OF] = {
 #define ASM_AND_REG_REG(as, reg_dest, reg_src) asm_arm_and_reg_reg_reg((as), (reg_dest), (reg_dest), (reg_src))
 #define ASM_ADD_REG_REG(as, reg_dest, reg_src) asm_arm_add_reg_reg_reg((as), (reg_dest), (reg_dest), (reg_src))
 #define ASM_SUB_REG_REG(as, reg_dest, reg_src) asm_arm_sub_reg_reg_reg((as), (reg_dest), (reg_dest), (reg_src))
+#define ASM_MUL_REG_REG(as, reg_dest, reg_src) asm_arm_mul_reg_reg_reg((as), (reg_dest), (reg_dest), (reg_src))
 
 #define ASM_LOAD_REG_REG(as, reg_dest, reg_base) asm_arm_ldr_reg_reg((as), (reg_dest), (reg_base), 0)
 #define ASM_LOAD_REG_REG_OFFSET(as, reg_dest, reg_base, word_offset) asm_arm_ldr_reg_reg((as), (reg_dest), (reg_base), 4 * (word_offset))
@@ -1424,10 +1428,17 @@ STATIC void emit_native_load_subscr(emit_t *emit) {
     vtype_kind_t vtype_base = peek_vtype(emit, 1);
 
     if (vtype_base == VTYPE_PYOBJ) {
-        // standard Python call
-        vtype_kind_t vtype_index;
-        emit_pre_pop_reg_reg(emit, &vtype_index, REG_ARG_2, &vtype_base, REG_ARG_1);
-        assert(vtype_index == VTYPE_PYOBJ);
+        // standard Python subscr
+        // TODO factor this implicit cast code with other uses of it
+        vtype_kind_t vtype_index = peek_vtype(emit, 0);
+        if (vtype_index == VTYPE_PYOBJ) {
+            emit_pre_pop_reg(emit, &vtype_index, REG_ARG_2);
+        } else {
+            emit_pre_pop_reg(emit, &vtype_index, REG_ARG_1);
+            emit_call_with_imm_arg(emit, MP_F_CONVERT_NATIVE_TO_OBJ, vtype_index, REG_ARG_2); // arg2 = type
+            ASM_MOV_REG_REG(emit->as, REG_ARG_2, REG_RET);
+        }
+        emit_pre_pop_reg(emit, &vtype_base, REG_ARG_1);
         emit_call_with_imm_arg(emit, MP_F_OBJ_SUBSCR, (mp_uint_t)MP_OBJ_SENTINEL, REG_ARG_3);
         emit_post_push_reg(emit, VTYPE_PYOBJ, REG_RET);
     } else {
@@ -1599,11 +1610,16 @@ STATIC void emit_native_store_subscr(emit_t *emit) {
     vtype_kind_t vtype_base = peek_vtype(emit, 1);
 
     if (vtype_base == VTYPE_PYOBJ) {
-        // standard Python call
-        vtype_kind_t vtype_index, vtype_value;
+        // standard Python subscr
+        vtype_kind_t vtype_index = peek_vtype(emit, 0);
+        vtype_kind_t vtype_value = peek_vtype(emit, 2);
+        if (vtype_index != VTYPE_PYOBJ || vtype_value != VTYPE_PYOBJ) {
+            // need to implicitly convert non-objects to objects
+            // TODO do this properly
+            emit_get_stack_pointer_to_reg_for_pop(emit, REG_ARG_1, 3);
+            adjust_stack(emit, 3);
+        }
         emit_pre_pop_reg_reg_reg(emit, &vtype_index, REG_ARG_2, &vtype_base, REG_ARG_1, &vtype_value, REG_ARG_3);
-        assert(vtype_index == VTYPE_PYOBJ);
-        assert(vtype_value == VTYPE_PYOBJ);
         emit_call(emit, MP_F_OBJ_SUBSCR);
     } else {
         // viper store
@@ -2017,6 +2033,9 @@ STATIC void emit_native_binary_op(emit_t *emit, mp_binary_op_t op) {
         } else if (op == MP_BINARY_OP_SUBTRACT || op == MP_BINARY_OP_INPLACE_SUBTRACT) {
             ASM_SUB_REG_REG(emit->as, REG_ARG_2, reg_rhs);
             emit_post_push_reg(emit, VTYPE_INT, REG_ARG_2);
+        } else if (op == MP_BINARY_OP_MULTIPLY || op == MP_BINARY_OP_INPLACE_MULTIPLY) {
+            ASM_MUL_REG_REG(emit->as, REG_ARG_2, reg_rhs);
+            emit_post_push_reg(emit, VTYPE_INT, REG_ARG_2);
         } else if (MP_BINARY_OP_LESS <= op && op <= MP_BINARY_OP_NOT_EQUAL) {
             // comparison ops are (in enum order):
             //  MP_BINARY_OP_LESS
@@ -2081,7 +2100,9 @@ STATIC void emit_native_binary_op(emit_t *emit, mp_binary_op_t op) {
             emit_post_push_reg(emit, VTYPE_BOOL, REG_RET);
         } else {
             // TODO other ops not yet implemented
-            assert(0);
+            adjust_stack(emit, 1);
+            EMIT_NATIVE_VIPER_TYPE_ERROR(emit,
+                "binary op %q not implemented", mp_binary_op_method_name[op]);
         }
     } else if (vtype_lhs == VTYPE_PYOBJ && vtype_rhs == VTYPE_PYOBJ) {
         emit_pre_pop_reg_reg(emit, &vtype_rhs, REG_ARG_3, &vtype_lhs, REG_ARG_2);

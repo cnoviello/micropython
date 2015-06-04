@@ -49,7 +49,6 @@
 #define TELNET_TX_RETRIES_MAX               25
 #define TELNET_WAIT_TIME_MS                 5
 #define TELNET_LOGIN_RETRIES_MAX            3
-#define TELNET_TIMEOUT_MS                   300000        // 5 minutes
 #define TELNET_CYCLE_TIME_MS                (SERVERS_CYCLE_TIME_MS * 2)
 
 /******************************************************************************
@@ -151,7 +150,7 @@ void telnet_run (void) {
             telnet_wait_for_enabled();
             break;
         case E_TELNET_STE_START:
-            if (telnet_create_socket()) {
+            if (wlan_is_connected() && telnet_create_socket()) {
                 telnet_data.state = E_TELNET_STE_LISTEN;
             }
             break;
@@ -237,7 +236,7 @@ void telnet_run (void) {
     }
 
     if (telnet_data.state >= E_TELNET_STE_CONNECTED) {
-        if (telnet_data.timeout++ > (TELNET_TIMEOUT_MS / TELNET_CYCLE_TIME_MS)) {
+        if (telnet_data.timeout++ > (servers_get_timeout() / TELNET_CYCLE_TIME_MS)) {
             telnet_reset();
         }
     }
@@ -335,19 +334,22 @@ static bool telnet_create_socket (void) {
 
         // Enable non-blocking mode
         nonBlockingOption.NonblockingEnabled = 1;
-        ASSERT (sl_SetSockOpt(telnet_data.sd, SOL_SOCKET, SL_SO_NONBLOCKING, &nonBlockingOption, sizeof(nonBlockingOption)) == SL_SOC_OK);
+        ASSERT ((result = sl_SetSockOpt(telnet_data.sd, SOL_SOCKET, SL_SO_NONBLOCKING, &nonBlockingOption, sizeof(nonBlockingOption))) == SL_SOC_OK);
 
         // Bind the socket to a port number
         sServerAddress.sin_family = AF_INET;
         sServerAddress.sin_addr.s_addr = INADDR_ANY;
         sServerAddress.sin_port = htons(TELNET_PORT);
 
-        ASSERT (sl_Bind(telnet_data.sd, (const SlSockAddr_t *)&sServerAddress, sizeof(sServerAddress)) == SL_SOC_OK);
+        ASSERT ((result |= sl_Bind(telnet_data.sd, (const SlSockAddr_t *)&sServerAddress, sizeof(sServerAddress))) == SL_SOC_OK);
 
         // Start listening
-        ASSERT ((result = sl_Listen (telnet_data.sd, TELNET_MAX_CLIENTS)) == SL_SOC_OK);
+        ASSERT ((result |= sl_Listen (telnet_data.sd, TELNET_MAX_CLIENTS)) == SL_SOC_OK);
 
-        return (result == SL_SOC_OK) ? true : false;
+        if (result == SL_SOC_OK) {
+            return true;
+        }
+        servers_close_socket(&telnet_data.sd);
     }
 
     return false;

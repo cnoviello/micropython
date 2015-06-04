@@ -68,7 +68,6 @@
 #define FTP_UNIX_TIME_20150101              1420070400
 #define FTP_UNIX_SECONDS_180_DAYS           15552000
 #define FTP_DATA_TIMEOUT_MS                 5000            // 5 seconds
-#define FTP_CMD_TIMEOUT_MS                  120000          // 2 minutes
 #define FTP_SOCKETFIFO_ELEMENTS_MAX         4
 #define FTP_CYCLE_TIME_MS                   (SERVERS_CYCLE_TIME_MS * 2)
 
@@ -253,7 +252,7 @@ void ftp_run (void) {
             ftp_wait_for_enabled();
             break;
         case E_FTP_STE_START:
-            if (ftp_create_listening_socket(&ftp_data.lc_sd, FTP_CMD_PORT, FTP_CMD_CLIENTS_MAX )) {
+            if (wlan_is_connected() && ftp_create_listening_socket(&ftp_data.lc_sd, FTP_CMD_PORT, FTP_CMD_CLIENTS_MAX)) {
                 ftp_data.state = E_FTP_STE_READY;
             }
             break;
@@ -444,19 +443,22 @@ static bool ftp_create_listening_socket (_i16 *sd, _u16 port, _u8 backlog) {
 
         // Enable non-blocking mode
         nonBlockingOption.NonblockingEnabled = 1;
-        ASSERT (sl_SetSockOpt(_sd, SOL_SOCKET, SL_SO_NONBLOCKING, &nonBlockingOption, sizeof(nonBlockingOption)) == SL_SOC_OK);
+        ASSERT ((result = sl_SetSockOpt(_sd, SOL_SOCKET, SL_SO_NONBLOCKING, &nonBlockingOption, sizeof(nonBlockingOption))) == SL_SOC_OK);
 
         // Bind the socket to a port number
         sServerAddress.sin_family = AF_INET;
         sServerAddress.sin_addr.s_addr = INADDR_ANY;
         sServerAddress.sin_port = htons(port);
 
-        ASSERT (sl_Bind(_sd, (const SlSockAddr_t *)&sServerAddress, sizeof(sServerAddress)) == SL_SOC_OK);
+        ASSERT ((result |= sl_Bind(_sd, (const SlSockAddr_t *)&sServerAddress, sizeof(sServerAddress))) == SL_SOC_OK);
 
         // Start listening
-        ASSERT ((result = sl_Listen (_sd, backlog)) == SL_SOC_OK);
+        ASSERT ((result |= sl_Listen (_sd, backlog)) == SL_SOC_OK);
 
-        return (result == SL_SOC_OK) ? true : false;
+        if (result == SL_SOC_OK) {
+            return true;
+        }
+        servers_close_socket(sd);
     }
     return false;
 }
@@ -838,7 +840,7 @@ static void ftp_process_cmd (void) {
         }
     }
     else if (result == E_FTP_RESULT_CONTINUE) {
-        if (ftp_data.ctimeout++ > (FTP_CMD_TIMEOUT_MS / FTP_CYCLE_TIME_MS)) {
+        if (ftp_data.ctimeout++ > (servers_get_timeout() / FTP_CYCLE_TIME_MS)) {
             ftp_send_reply(221, NULL);
         }
     }
