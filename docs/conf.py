@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Micro Python documentation build configuration file, created by
+# MicroPython documentation build configuration file, created by
 # sphinx-quickstart on Sun Sep 21 11:42:03 2014.
 #
 # This file is execfile()d with the current directory set to its
@@ -50,7 +50,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'Micro Python'
+project = 'MicroPython'
 copyright = '2014, Damien P. George'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -134,7 +134,7 @@ else:
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-#html_logo = '../logo/trans-logo.png'
+#html_logo = '../../logo/trans-logo.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -213,7 +213,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'MicroPython.tex', 'Micro Python Documentation',
+  ('index', 'MicroPython.tex', 'MicroPython Documentation',
    'Damien P. George', 'manual'),
 ]
 
@@ -243,7 +243,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'micropython', 'Micro Python Documentation',
+    ('index', 'micropython', 'MicroPython Documentation',
      ['Damien P. George'], 1),
 ]
 
@@ -257,7 +257,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'MicroPython', 'Micro Python Documentation',
+  ('index', 'MicroPython', 'MicroPython Documentation',
    'Damien P. George', 'MicroPython', 'One line description of project.',
    'Miscellaneous'),
 ]
@@ -277,3 +277,23 @@ texinfo_documents = [
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {'http://docs.python.org/': None}
+
+
+# Work out the port to generate the docs for
+from collections import OrderedDict
+micropy_port = os.getenv('MICROPY_PORT') or 'pyboard'
+tags.add('port_' + micropy_port)
+ports = OrderedDict((
+    ("unix", "unix"),
+    ("pyboard", "the pyboard"),
+    ("wipy", "the WiPy"),
+    ("esp8266", "esp8266"),
+))
+
+# The members of the html_context dict are available inside topindex.html
+url_prefix = os.getenv('MICROPY_URL_PREFIX') or '/'
+html_context = {
+    'port':micropy_port,
+    'port_name':ports[micropy_port],
+    'all_ports':[(n, url_prefix + p) for p, n in ports.items()],
+}
