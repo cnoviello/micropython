@@ -98,6 +98,10 @@ Q(SLEEP_NONE)
 Q(SLEEP_LIGHT)
 Q(SLEEP_MODEM)
 
+// network module
+Q(network)
+Q(WLAN)
+
 // Pin class
 Q(Pin)
 Q(init)

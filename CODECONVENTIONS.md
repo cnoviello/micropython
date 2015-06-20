@@ -33,16 +33,15 @@ Braces:
   closing brace.
 
 Header files:
-- Try to stick to the Plan 9 header style, where header files do not
-  include other header files.
-- Don't protect a header file from multiple inclusion with #if directives.
+- Header files should be protected from multiple inclusion with #if
+  directives. See an existing header for naming convention.
 
 Type names and declarations:
 - When defining a type, put '_t' after it.
 
-Integer types: Micro Python runs on 32 and 64 bit machines (and one day
-maybe 16 bit), so it's important to use the correctly-sized (and signed)
-integer types.  The general guidelines are:
+Integer types: Micro Python runs on 16, 32, and 64 bit machines, so it's
+important to use the correctly-sized (and signed) integer types.  The
+general guidelines are:
 - For most cases use mp_int_t for signed and mp_uint_t for unsigned
   integer values.  These are guaranteed to be machine-word sized and
   therefore big enough to hold the value from a Micro Python small-int

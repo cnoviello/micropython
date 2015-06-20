@@ -46,6 +46,7 @@ Additional components:
   (preliminary but functional).
 - pic16bit/ -- a version of Micro Python for 16-bit PIC microcontrollers.
 - cc3200/ -- a version of Micro Python that runs on the CC3200 from TI.
+- esp8266/ -- an experimental port for ESP8266 WiFi modules.
 - unix-cpy/ -- a version of Micro Python that outputs bytecode (for testing).
 - tests/ -- test framework and test scripts.
 - tools/ -- various tools, including the pyboard.py module.
@@ -121,6 +122,8 @@ preferably in a virtualenv:
 
 In `micropython/docs`, build the docs:
 
-    make html
+    make MICROPY_PORT=<port_name> BUILDDIR=<port_name>/build html
 
-You'll find the index page at `micropython/docs/build/html/index.html`.
+Where `<port_name>` can be `unix`, `pyboard`, `wipy` or `esp8266`.
+
+You'll find the index page at `micropython/docs/<port_name>/build/html/index.html`.
