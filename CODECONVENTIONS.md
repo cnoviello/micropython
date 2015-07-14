@@ -33,16 +33,17 @@ Braces:
   closing brace.
 
 Header files:
-- Try to stick to the Plan 9 header style, where header files do not
-  include other header files.
-- Don't protect a header file from multiple inclusion with #if directives.
+- Header files should be protected from multiple inclusion with #if
+  directives. See an existing header for naming convention.
 
-Type names and declarations:
-- When defining a type, put '_t' after it.
+Names:
+- Use underscore_case, not camelCase for all names.
+- Use CAPS_WITH_UNDERSCORE for enums and macros.
+- When defining a type use underscore_case and put '_t' after it.
 
-Integer types: Micro Python runs on 32 and 64 bit machines (and one day
-maybe 16 bit), so it's important to use the correctly-sized (and signed)
-integer types.  The general guidelines are:
+Integer types: Micro Python runs on 16, 32, and 64 bit machines, so it's
+important to use the correctly-sized (and signed) integer types.  The
+general guidelines are:
 - For most cases use mp_int_t for signed and mp_uint_t for unsigned
   integer values.  These are guaranteed to be machine-word sized and
   therefore big enough to hold the value from a Micro Python small-int
@@ -51,19 +52,27 @@ integer types.  The general guidelines are:
 - You can use int/uint, but remember that they may be 16-bits wide.
 - If in doubt, use mp_int_t/mp_uint_t.
 
+Comments:
+- Be concise and only write comments for things that are not obvious.
+- Use `// ` prefix, NOT `/* ... */`. No extra fluff.
+
 Examples
 --------
 
-Braces and spaces:
+Braces, spaces, names and comments:
 
-    int foo(int x, int y) {
-        if (x < y) {
-            foo(y, x);
+    #define TO_ADD (123)
+
+    // This function will always recurse indefinitely and is only used to show
+    // coding style
+    int foo_function(int x, int some_value) {
+        if (x < some_value) {
+            foo(some_value, x);
         } else {
-            foo(x + 1, y - 1);
+            foo(x + TO_ADD, some_value - 1);
         }
 
-        for (int i = 0; i < x; i++) {
+        for (int my_counter = 0; my_counter < x; my_counter++) {
         }
     }
 

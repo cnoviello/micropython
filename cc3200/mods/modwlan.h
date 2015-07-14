@@ -63,6 +63,7 @@ extern void wlan_start (void);
 extern void wlan_get_mac (uint8_t *macAddress);
 extern void wlan_get_ip (uint32_t *ip);
 extern bool wlan_is_connected (void);
+extern void wlan_set_current_time (uint32_t seconds_since_2000);
 
 extern int wlan_gethostbyname(const char *name, mp_uint_t len, uint8_t *out_ip, uint8_t family);
 extern int wlan_socket_socket(mod_network_socket_obj_t *s, int *_errno);
@@ -75,8 +76,8 @@ extern int wlan_socket_send(mod_network_socket_obj_t *s, const byte *buf, mp_uin
 extern int wlan_socket_recv(mod_network_socket_obj_t *s, byte *buf, mp_uint_t len, int *_errno);
 extern int wlan_socket_sendto( mod_network_socket_obj_t *s, const byte *buf, mp_uint_t len, byte *ip, mp_uint_t port, int *_errno);
 extern int wlan_socket_recvfrom(mod_network_socket_obj_t *s, byte *buf, mp_uint_t len, byte *ip, mp_uint_t *port, int *_errno);
-extern int wlan_socket_setsockopt(mod_network_socket_obj_t *socket, mp_uint_t level, mp_uint_t opt, const void *optval, mp_uint_t optlen, int *_errno);
-extern int wlan_socket_settimeout(mod_network_socket_obj_t *s, mp_uint_t timeout_ms, int *_errno);
+extern int wlan_socket_setsockopt(mod_network_socket_obj_t *s, mp_uint_t level, mp_uint_t opt, const void *optval, mp_uint_t optlen, int *_errno);
+extern int wlan_socket_settimeout(mod_network_socket_obj_t *s, mp_uint_t timeout_s, int *_errno);
 extern int wlan_socket_ioctl (mod_network_socket_obj_t *s, mp_uint_t request, mp_uint_t arg, int *_errno);
 
 #endif /* MODWLAN_H_ */

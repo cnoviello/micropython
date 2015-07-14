@@ -3,7 +3,6 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2014 Paul Sokolovsky
  * Copyright (c) 2015 Daniel Campora
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,9 +23,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MODUHASHLIB_H_
-#define MODUHASHLIB_H_
 
-extern const mp_obj_module_t mp_module_uhashlib;
+#ifndef _ANTENNA_H_
+#define _ANTENNA_H_
 
-#endif // MODUHASHLIB_H_
+typedef enum {
+    ANTENNA_TYPE_INTERNAL = 0,
+    ANTENNA_TYPE_EXTERNAL
+} antenna_type_t;
+
+extern void antenna_init0 (void);
+extern void antenna_select (antenna_type_t antenna_type);
+
+#endif /* _ANTENNA_H_ */

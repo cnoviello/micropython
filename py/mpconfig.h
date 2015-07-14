@@ -393,6 +393,15 @@ typedef double mp_float_t;
 #define MICROPY_CAN_OVERRIDE_BUILTINS (0)
 #endif
 
+// Whether to check that the "self" argument of a builtin method has the
+// correct type.  Such an explicit check is only needed if a builtin
+// method escapes to Python land without a first argument, eg
+// list.append([], 1).  Without this check such calls will have undefined
+// behaviour (usually segfault) if the first argument is the wrong type.
+#ifndef MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG
+#define MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG (1)
+#endif
+
 /*****************************************************************************/
 /* Fine control over Python builtins, classes, modules, etc                  */
 
@@ -451,6 +460,11 @@ typedef double mp_float_t;
 // the "range" builtin type. Rarely used, and costs ~60 bytes (x86).
 #ifndef MICROPY_PY_BUILTINS_RANGE_ATTRS
 #define MICROPY_PY_BUILTINS_RANGE_ATTRS (1)
+#endif
+
+// Whether to support timeout exceptions (like socket.timeout)
+#ifndef MICROPY_PY_BUILTINS_TIMEOUTERROR
+#define MICROPY_PY_BUILTINS_TIMEOUTERROR (0)
 #endif
 
 // Whether to support complete set of special methods

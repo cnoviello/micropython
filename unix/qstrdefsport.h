@@ -70,6 +70,8 @@ Q(bind)
 Q(listen)
 Q(accept)
 Q(recv)
+Q(recvfrom)
+Q(sendto)
 Q(setsockopt)
 Q(setblocking)
 

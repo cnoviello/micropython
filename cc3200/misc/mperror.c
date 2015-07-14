@@ -32,6 +32,7 @@
 #include "py/mpconfig.h"
 #include MICROPY_HAL_H
 #include "py/obj.h"
+#include "py/runtime.h"
 #include "hw_ints.h"
 #include "hw_types.h"
 #include "hw_gpio.h"
@@ -63,6 +64,10 @@
 /******************************************************************************
  DECLARE PRIVATE DATA
  ******************************************************************************/
+#ifndef BOOTLOADER
+STATIC const mp_obj_base_t pyb_heartbeat_obj = {&pyb_heartbeat_type};
+#endif
+
 struct mperror_heart_beat {
     uint32_t off_time;
     uint32_t on_time;
@@ -91,6 +96,7 @@ void mperror_init0 (void) {
     // configure the system led
     pin_config ((pin_obj_t *)&MICROPY_SYS_LED_GPIO, PIN_MODE_0, GPIO_DIR_MODE_OUT, PIN_TYPE_STD, PIN_STRENGTH_6MA);
 #endif
+    mperror_heart_beat.enabled = true;
     mperror_heartbeat_switch_off();
 }
 
@@ -132,25 +138,19 @@ void mperror_signal_error (void) {
     }
 }
 
-void mperror_enable_heartbeat (void) {
-    mperror_heart_beat.enabled = true;
-}
-
 void mperror_heartbeat_switch_off (void) {
-    mperror_heart_beat.on_time = 0;
-    mperror_heart_beat.off_time = 0;
-    MAP_GPIOPinWrite(MICROPY_SYS_LED_PORT, MICROPY_SYS_LED_PORT_PIN, 0);
-}
-
-void mperror_disable_heartbeat (void) {
-    mperror_heart_beat.do_disable = true;
+    if (mperror_heart_beat.enabled) {
+        mperror_heart_beat.on_time = 0;
+        mperror_heart_beat.off_time = 0;
+        MAP_GPIOPinWrite(MICROPY_SYS_LED_PORT, MICROPY_SYS_LED_PORT_PIN, 0);
+    }
 }
 
 void mperror_heartbeat_signal (void) {
     if (mperror_heart_beat.do_disable) {
-        mperror_heart_beat.enabled = false;
         mperror_heart_beat.do_disable = false;
         mperror_heartbeat_switch_off();
+        mperror_heart_beat.enabled = false;
     }
     else if (mperror_heart_beat.enabled) {
         if (!mperror_heart_beat.beating) {
@@ -203,10 +203,21 @@ void nlr_jump_fail(void *val) {
 /******************************************************************************/
 // Micro Python bindings
 
+/// \classmethod \constructor()
+///
+/// Return the heart beat object
+STATIC mp_obj_t pyb_heartbeat_make_new(mp_obj_t type_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    // check arguments
+    mp_arg_check_num(n_args, n_kw, 0, 0, false);
+
+    // return constant object
+    return (mp_obj_t)&pyb_heartbeat_obj;
+}
+
 /// \function enable()
 /// Enables the heartbeat signal
 STATIC mp_obj_t pyb_enable_heartbeat(mp_obj_t self) {
-    mperror_enable_heartbeat ();
+    mperror_heart_beat.enabled = true;
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(pyb_enable_heartbeat_obj, pyb_enable_heartbeat);
@@ -214,7 +225,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(pyb_enable_heartbeat_obj, pyb_enable_heartbeat)
 /// \function disable()
 /// Disables the heartbeat signal
 STATIC mp_obj_t pyb_disable_heartbeat(mp_obj_t self) {
-    mperror_disable_heartbeat ();
+    mperror_heart_beat.do_disable = true;
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(pyb_disable_heartbeat_obj, pyb_disable_heartbeat);
@@ -225,11 +236,11 @@ STATIC const mp_map_elem_t pyb_heartbeat_locals_dict_table[] = {
 };
 STATIC MP_DEFINE_CONST_DICT(pyb_heartbeat_locals_dict, pyb_heartbeat_locals_dict_table);
 
-static const mp_obj_type_t pyb_heartbeat_type = {
+const mp_obj_type_t pyb_heartbeat_type = {
     { &mp_type_type },
     .name = MP_QSTR_HeartBeat,
+    .make_new = pyb_heartbeat_make_new,
     .locals_dict = (mp_obj_t)&pyb_heartbeat_locals_dict,
 };
 
-const mp_obj_base_t pyb_heartbeat_obj = {&pyb_heartbeat_type};
 #endif

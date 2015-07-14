@@ -122,10 +122,13 @@ STATIC mp_obj_t time_mktime(mp_obj_t tuple) {
 MP_DEFINE_CONST_FUN_OBJ_1(time_mktime_obj, time_mktime);
 
 
-/// \function sleep(milliseconds)
-/// Sleep for the given number of milliseconds.
-STATIC mp_obj_t time_sleep(mp_obj_t milliseconds_o) {
-    HAL_Delay(mp_obj_get_int(milliseconds_o));
+/// \function sleep(seconds)
+/// Sleep for the given number of seconds.
+STATIC mp_obj_t time_sleep(mp_obj_t seconds_o) {
+    int32_t sleep_s = mp_obj_get_int(seconds_o);
+    if (sleep_s > 0) {
+        HAL_Delay(sleep_s * 1000);
+    }
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_1(time_sleep_obj, time_sleep);
@@ -133,12 +136,7 @@ MP_DEFINE_CONST_FUN_OBJ_1(time_sleep_obj, time_sleep);
 /// \function time()
 /// Returns the number of seconds, as an integer, since 1/1/2000.
 STATIC mp_obj_t time_time(void) {
-    uint32_t seconds;
-    uint16_t mseconds;
-
-    // get the seconds and the milliseconds from the RTC
-    MAP_PRCMRTCGet(&seconds, &mseconds);
-    return mp_obj_new_int(seconds);
+    return mp_obj_new_int(pybrtc_get_seconds());
 }
 MP_DEFINE_CONST_FUN_OBJ_0(time_time_obj, time_time);
 

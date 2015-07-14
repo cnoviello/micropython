@@ -53,6 +53,7 @@
 #include "cc3200_hal.h"
 #include "debug.h"
 #include "mperror.h"
+#include "antenna.h"
 
 
 //*****************************************************************************
@@ -63,11 +64,11 @@
 #define BOOTMGR_HASH_SIZE                   32
 #define BOOTMGR_BUFF_SIZE                   512
 
-#define BOOTMGR_WAIT_SAFE_MODE_MS           1200
-#define BOOTMGR_WAIT_SAFE_MODE_TOOGLE_MS    200
+#define BOOTMGR_WAIT_SAFE_MODE_MS           2400
+#define BOOTMGR_WAIT_SAFE_MODE_TOOGLE_MS    400
 
-#define BOOTMGR_SAFE_MODE_ENTER_MS          800
-#define BOOTMGR_SAFE_MODE_ENTER_TOOGLE_MS   80
+#define BOOTMGR_SAFE_MODE_ENTER_MS          1600
+#define BOOTMGR_SAFE_MODE_ENTER_TOOGLE_MS   160
 
 //*****************************************************************************
 // Exported functions declarations
@@ -150,6 +151,11 @@ static void bootmgr_board_init(void) {
     PRCMCC3200MCUInit();
 
     mperror_bootloader_check_reset_cause();
+
+#if MICROPY_HW_ANTENNA_DIVERSITY
+    // configure the antenna selection pins
+    antenna_init0();
+#endif
 
     // Enable the Data Hashing Engine
     CRYPTOHASH_Init();

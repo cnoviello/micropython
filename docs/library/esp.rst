@@ -10,22 +10,6 @@ The ``esp`` module contains specific functions related to the ESP8266 module.
 Functions
 ---------
 
-.. function:: connect(ssid, password)
-
-    Connect to the specified wireless network, using the specified password.
-
-.. function:: disconnect()
-
-    Disconnect from the currently connected wireless network.
-
-.. function:: scan(cb)
-
-    Initiate scanning for the available wireless networks.
-
-    Once the scanning is complete, the provided callback function ``cb`` will
-    be called once for each network found, and passed a tuple with information
-    about that network.
-
 .. function:: status()
 
     Return the current status of the wireless connection.

@@ -426,6 +426,7 @@ extern const mp_obj_type_t mp_type_MemoryError;
 extern const mp_obj_type_t mp_type_NameError;
 extern const mp_obj_type_t mp_type_NotImplementedError;
 extern const mp_obj_type_t mp_type_OSError;
+extern const mp_obj_type_t mp_type_TimeoutError;
 extern const mp_obj_type_t mp_type_OverflowError;
 extern const mp_obj_type_t mp_type_RuntimeError;
 extern const mp_obj_type_t mp_type_StopIteration;
@@ -575,7 +576,6 @@ typedef struct _mp_obj_float_t {
 } mp_obj_float_t;
 mp_float_t mp_obj_float_get(mp_obj_t self_in);
 mp_obj_t mp_obj_float_binary_op(mp_uint_t op, mp_float_t lhs_val, mp_obj_t rhs); // can return MP_OBJ_NULL if op not supported
-void mp_obj_float_divmod(mp_float_t *x, mp_float_t *y);
 
 // complex
 void mp_obj_complex_get(mp_obj_t self_in, mp_float_t *real, mp_float_t *imag);
