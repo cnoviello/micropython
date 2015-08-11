@@ -127,11 +127,9 @@ int readline_process_char(int c) {
         } else if (c == CHAR_CTRL_E) {
             // CTRL-E is go-to-end-of-line
             goto end_key;
-		#if !MICROPY_REPL_EMACS_KEYS
         } else if (c == CHAR_CTRL_F) {
             // CTRL-F 
             return c;
-		#endif
         #if MICROPY_REPL_EMACS_KEYS
         } else if (c == CHAR_CTRL_F) {
             // CTRL-F with non-empty line is go-forward-one-char
@@ -154,7 +152,6 @@ int readline_process_char(int c) {
 	    redraw_step_back = rl.cursor_pos - rl.orig_line_len;
 	    redraw_from_cursor = true;
         #endif
->>>>>>> 7da2fdc3cdd422d0cba60b40146aba07881bdc97
         } else if (c == '\r') {
             // newline
             mp_hal_stdout_tx_str("\r\n");

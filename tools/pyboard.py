@@ -256,7 +256,7 @@ class Pyboard:
             self.serial.write(bytes(c, 'utf8')) #Sends filename
             time.sleep(0.1) #This value was derived doing experiments. 
             counter+=1
-            print('Transferred %d bytes\r'%counter, end="")
+            print('Transferred %d bytes\r'%counter)
         self.serial.write(bytes(chr(1), 'ascii')) #Sends CTRL-A to commit file content        
         print("Transferred %d bytes" % counter)
 
