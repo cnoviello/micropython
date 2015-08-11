@@ -67,6 +67,7 @@
 #include "pybtimer.h"
 #include "mpcallback.h"
 #include "cryptohash.h"
+#include "updater.h"
 
 /******************************************************************************
  DECLARE PRIVATE CONSTANTS
@@ -104,9 +105,13 @@ void TASK_Micropython (void *pvParameters) {
     // initialize the garbage collector with the top of our stack
     uint32_t sp = gc_helper_get_sp();
     gc_collect_init (sp);
-    bool safeboot = false;
 
+    bool safeboot = false;
     mptask_pre_init();
+
+#ifndef DEBUG
+    safeboot = PRCMGetSpecialBit(PRCM_SAFE_BOOT_BIT);
+#endif
 
 soft_reset:
 
@@ -160,9 +165,6 @@ soft_reset:
         else {
             // only if not comming out of hibernate or a soft reset
             mptask_enter_ap_mode();
-        #ifndef DEBUG
-            safeboot = PRCMIsSafeBootRequested();
-        #endif
         }
 
         // enable telnet and ftp
@@ -279,6 +281,9 @@ STATIC void mptask_pre_init (void) {
     // this one allocates memory for the WLAN semaphore
     wlan_pre_init();
 
+    // this one allocates memory for the updater semaphore
+    updater_pre_init();
+
     // this one allocates memory for the Socket semaphore
     modusocket_pre_init();
 
@@ -308,7 +313,6 @@ STATIC void mptask_init_sflash_filesystem (void) {
 
     // Initialise the local flash filesystem.
     // Create it if needed, and mount in on /flash.
-    // try to mount the flash
     FRESULT res = f_mount(sflash_fatfs, "/flash", 1);
     if (res == FR_NO_FILESYSTEM) {
         // no filesystem, so create a fresh one
@@ -334,7 +338,20 @@ STATIC void mptask_init_sflash_filesystem (void) {
     // It is set to the internal flash filesystem by default.
     f_chdrive("/flash");
 
-    // Make sure we have a /flash/boot.py.  Create it if needed.
+    // create /flash/sys, /flash/lib and /flash/cert if they don't exist
+    if (FR_OK != f_chdir ("/flash/sys")) {
+        f_mkdir("/flash/sys");
+    }
+    if (FR_OK != f_chdir ("/flash/lib")) {
+        f_mkdir("/flash/lib");
+    }
+    if (FR_OK != f_chdir ("/flash/cert")) {
+        f_mkdir("/flash/cert");
+    }
+
+    f_chdir ("/flash");
+
+    // make sure we have a /flash/boot.py.  Create it if needed.
     res = f_stat("/flash/boot.py", &fno);
     if (res == FR_OK) {
         if (fno.fattrib & AM_DIR) {
@@ -356,9 +373,12 @@ STATIC void mptask_init_sflash_filesystem (void) {
 }
 
 STATIC void mptask_enter_ap_mode (void) {
-    // enable simplelink in low power mode
+    // append the mac only if it's not the first boot
+    bool append_mac = !PRCMGetSpecialBit(PRCM_FIRST_BOOT_BIT);
+
+    // enable simplelink in ap mode (use the MAC address to make the ssid unique)
     wlan_sl_enable (ROLE_AP, MICROPY_PORT_WLAN_AP_SSID, strlen(MICROPY_PORT_WLAN_AP_SSID), MICROPY_PORT_WLAN_AP_SECURITY,
-                    MICROPY_PORT_WLAN_AP_KEY, strlen(MICROPY_PORT_WLAN_AP_KEY), MICROPY_PORT_WLAN_AP_CHANNEL);
+                    MICROPY_PORT_WLAN_AP_KEY, strlen(MICROPY_PORT_WLAN_AP_KEY), MICROPY_PORT_WLAN_AP_CHANNEL, append_mac);
 }
 
 STATIC void mptask_create_main_py (void) {

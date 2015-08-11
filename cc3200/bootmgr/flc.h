@@ -43,23 +43,31 @@ extern "C"
 *******************************************************************************/
 #define IMG_BOOT_INFO           "/sys/bootinfo.bin"
 #define IMG_FACTORY             "/sys/factimg.bin"
-#define IMG_UPDATE              "/sys/updtimg.bin"
+#define IMG_UPDATE1             "/sys/updtimg1.bin"
+#define IMG_UPDATE2             "/sys/updtimg2.bin"
+#define IMG_PREFIX              "/sys/updtimg"
 
 #define IMG_SRVPACK             "/sys/servicepack.ucf"
 #define SRVPACK_SIGN            "/sys/servicepack.sig"
 
+#define CA_FILE                 "/cert/ca.pem"
+#define CERT_FILE               "/cert/cert.pem"
+#define KEY_FILE                "/cert/private.key"
+
 /******************************************************************************
-   Image file sizes
+   Special file sizes
 *******************************************************************************/
-#define IMG_SIZE                (232 * 1024)    /* 16KB are reserved for the bootloader and at least 8KB for the heap*/
+#define IMG_SIZE                (192 * 1024)    /* 16KB are reserved for the bootloader and at least 48KB for the heap*/
 #define SRVPACK_SIZE            (16  * 1024)
 #define SIGN_SIZE               (2   * 1024)
+#define CA_KEY_SIZE             (4   * 1024)
 
 /******************************************************************************
    Active Image
 *******************************************************************************/
 #define IMG_ACT_FACTORY         0
-#define IMG_ACT_UPDATE          1
+#define IMG_ACT_UPDATE1         1
+#define IMG_ACT_UPDATE2         2
 
 #define IMG_STATUS_CHECK        0
 #define IMG_STATUS_READY        1
@@ -67,13 +75,13 @@ extern "C"
 /******************************************************************************
    Boot Info structure
 *******************************************************************************/
-typedef struct sBootInfo
+typedef struct _sBootInfo_t
 {
   _u8  ActiveImg;
   _u8  Status;
+  _u8  PrevImg;
   _u8  : 8;
-  _u8  : 8;
-}sBootInfo_t;
+} sBootInfo_t;
 
 
 /******************************************************************************

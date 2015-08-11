@@ -1465,6 +1465,8 @@ not_enough_args:
     return mp_obj_new_str_from_vstr(&mp_type_str, &vstr);
 }
 
+// The implementation is optimized, returning the original string if there's
+// nothing to replace.
 STATIC mp_obj_t str_replace(mp_uint_t n_args, const mp_obj_t *args) {
     assert(MP_OBJ_IS_STR_OR_BYTES(args[0]));
 
@@ -1920,7 +1922,11 @@ mp_obj_t mp_obj_new_str_from_vstr(const mp_obj_type_t *type, vstr_t *vstr) {
     o->base.type = type;
     o->len = vstr->len;
     o->hash = qstr_compute_hash((byte*)vstr->buf, vstr->len);
-    o->data = (byte*)m_renew(char, vstr->buf, vstr->alloc, vstr->len + 1);
+    if (vstr->len + 1 == vstr->alloc) {
+        o->data = (byte*)vstr->buf;
+    } else {
+        o->data = (byte*)m_renew(char, vstr->buf, vstr->alloc, vstr->len + 1);
+    }
     ((byte*)o->data)[o->len] = '\0'; // add null byte
     vstr->buf = NULL;
     vstr->alloc = 0;

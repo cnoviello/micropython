@@ -244,6 +244,81 @@ void init_flash_fs(uint reset_mode) {
     }
 }
 
+STATIC uint update_reset_mode(uint reset_mode) {
+#if MICROPY_HW_HAS_SWITCH
+    if (switch_get()) {
+
+        // The original method used on the pyboard is appropriate if you have 2
+        // or more LEDs.
+#if defined(MICROPY_HW_LED2)
+        for (uint i = 0; i < 3000; i++) {
+            if (!switch_get()) {
+                break;
+            }
+            HAL_Delay(20);
+            if (i % 30 == 29) {
+                if (++reset_mode > 3) {
+                    reset_mode = 1;
+                }
+                led_state(2, reset_mode & 1);
+                led_state(3, reset_mode & 2);
+                led_state(4, reset_mode & 4);
+            }
+        }
+        // flash the selected reset mode
+        for (uint i = 0; i < 6; i++) {
+            led_state(2, 0);
+            led_state(3, 0);
+            led_state(4, 0);
+            HAL_Delay(50);
+            led_state(2, reset_mode & 1);
+            led_state(3, reset_mode & 2);
+            led_state(4, reset_mode & 4);
+            HAL_Delay(50);
+        }
+        HAL_Delay(400);
+
+#elif defined(MICROPY_HW_LED1)
+
+        // For boards with only a single LED, we'll flash that LED the
+        // appropriate number of times, with a pause between each one
+        for (uint i = 0; i < 10; i++) {
+            led_state(1, 0);
+            for (uint j = 0; j < reset_mode; j++) {
+                if (!switch_get()) {
+                    break;
+                }
+                led_state(1, 1);
+                HAL_Delay(100);
+                led_state(1, 0);
+                HAL_Delay(200);
+            }
+            HAL_Delay(400);
+            if (!switch_get()) {
+                break;
+            }
+            if (++reset_mode > 3) {
+                reset_mode = 1;
+            }
+        }
+        // Flash the selected reset mode
+        for (uint i = 0; i < 2; i++) {
+            for (uint j = 0; j < reset_mode; j++) {
+                led_state(1, 1);
+                HAL_Delay(100);
+                led_state(1, 0);
+                HAL_Delay(200);
+            }
+            HAL_Delay(400);
+        }
+#else
+#error Need a reset mode update method
+#endif
+    }
+#endif
+    return reset_mode;
+}
+
 int main(void) {
     // TODO disable JTAG
 
@@ -268,9 +343,20 @@ int main(void) {
     __GPIOC_CLK_ENABLE();
     __GPIOD_CLK_ENABLE();
 
+    #if defined(__HAL_RCC_DTCMRAMEN_CLK_ENABLE)
+    // The STM32F746 doesn't really have CCM memory, but it does have DTCM,
+    // which behaves more or less like normal SRAM.
+    __HAL_RCC_DTCMRAMEN_CLK_ENABLE();
+    #else
     // enable the CCM RAM
     __CCMDATARAMEN_CLK_ENABLE();
+    #endif
 
+    #if defined(MICROPY_BOARD_EARLY_INIT)
+    MICROPY_BOARD_EARLY_INIT();
+    #endif
+
+    //TODO - Move the following to a board_init.c file for the NETDUINO
 #if 0
 #if defined(NETDUINO_PLUS_2)
     {
@@ -313,42 +399,16 @@ int main(void) {
 soft_reset:
 
     // check if user switch held to select the reset mode
+#if defined(MICROPY_HW_LED2)
     led_state(1, 0);
     led_state(2, 1);
+#else
+    led_state(1, 1);
+    led_state(2, 0);
+#endif
     led_state(3, 0);
     led_state(4, 0);
-    uint reset_mode = 1;
-
-#if MICROPY_HW_HAS_SWITCH
-    if (switch_get()) {
-        for (uint i = 0; i < 3000; i++) {
-            if (!switch_get()) {
-                break;
-            }
-            HAL_Delay(20);
-            if (i % 30 == 29) {
-                if (++reset_mode > 3) {
-                    reset_mode = 1;
-                }
-                led_state(2, reset_mode & 1);
-                led_state(3, reset_mode & 2);
-                led_state(4, reset_mode & 4);
-            }
-        }
-        // flash the selected reset mode
-        for (uint i = 0; i < 6; i++) {
-            led_state(2, 0);
-            led_state(3, 0);
-            led_state(4, 0);
-            HAL_Delay(50);
-            led_state(2, reset_mode & 1);
-            led_state(3, reset_mode & 2);
-            led_state(4, reset_mode & 4);
-            HAL_Delay(50);
-        }
-        HAL_Delay(400);
-    }
-#endif
+    uint reset_mode = update_reset_mode(1);
 
 #if MICROPY_HW_ENABLE_RTC
     if (first_soft_reset) {
@@ -388,13 +448,14 @@ soft_reset:
     timer_init0();
     uart_init0();
 
-    // Change #if 0 to #if 1 if you want REPL on UART_6 (or another uart)
-    // as well as on USB VCP
-#if 1
+    // Define MICROPY_HW_UART_REPL to be PYB_UART_6 and define
+    // MICROPY_HW_UART_REPL_BAUD in your mpconfigboard.h file if you want a
+    // REPL on a hardware UART as well as on USB VCP
+#if defined(MICROPY_HW_UART_REPL)
     {
         mp_obj_t args[2] = {
-            MP_OBJ_NEW_SMALL_INT(PYB_UART_2),
-            MP_OBJ_NEW_SMALL_INT(115200),
+            MP_OBJ_NEW_SMALL_INT(MICROPY_HW_UART_REPL),
+            MP_OBJ_NEW_SMALL_INT(MICROPY_HW_UART_REPL_BAUD),
         };
         MP_STATE_PORT(pyb_stdio_uart) = pyb_uart_type.make_new((mp_obj_t)&pyb_uart_type, MP_ARRAY_SIZE(args), 0, args);
     }
@@ -468,6 +529,12 @@ soft_reset:
     }
 
     // turn boot-up LEDs off
+#if !defined(MICROPY_HW_LED2)
+    // If there is only one LED on the board then it's used to signal boot-up
+    // and so we turn it off here.  Otherwise LED(1) is used to indicate dirty
+    // flash cache and so we shouldn't change its state.
+    led_state(1, 0);
+#endif
     led_state(2, 0);
     led_state(3, 0);
     led_state(4, 0);

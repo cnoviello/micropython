@@ -75,6 +75,14 @@
 #define MICROPY_ALLOC_GC_STACK_SIZE (64)
 #endif
 
+// Number of bytes to allocate initially when creating new chunks to store
+// interned string data.  Smaller numbers lead to more chunks being needed
+// and more wastage at the end of the chunk.  Larger numbers lead to wasted
+// space at the end when no more strings need interning.
+#ifndef MICROPY_ALLOC_QSTR_CHUNK_INIT
+#define MICROPY_ALLOC_QSTR_CHUNK_INIT (128)
+#endif
+
 // Initial amount for lexer indentation level
 #ifndef MICROPY_ALLOC_LEXER_INDENT_INIT
 #define MICROPY_ALLOC_LEXER_INDENT_INIT (10)
@@ -142,6 +150,11 @@
 // (limit of 255 bytes in an identifier) should be enough for everyone
 #ifndef MICROPY_QSTR_BYTES_IN_LEN
 #define MICROPY_QSTR_BYTES_IN_LEN (1)
+#endif
+
+// Number of bytes used to store qstr hash
+#ifndef MICROPY_QSTR_BYTES_IN_HASH
+#define MICROPY_QSTR_BYTES_IN_HASH (2)
 #endif
 
 // Avoid using C stack when making Python function calls. C stack still
@@ -290,6 +303,11 @@
 #define MICROPY_HELPER_REPL (0)
 #endif
 
+// Whether to include emacs-style readline behavior in REPL
+#ifndef MICROPY_REPL_EMACS_KEYS
+#define MICROPY_REPL_EMACS_KEYS (0)
+#endif
+
 // Whether port requires event-driven REPL functions
 #ifndef MICROPY_REPL_EVENT_DRIVEN
 #define MICROPY_REPL_EVENT_DRIVEN (0)
@@ -393,6 +411,15 @@ typedef double mp_float_t;
 #define MICROPY_CAN_OVERRIDE_BUILTINS (0)
 #endif
 
+// Whether to check that the "self" argument of a builtin method has the
+// correct type.  Such an explicit check is only needed if a builtin
+// method escapes to Python land without a first argument, eg
+// list.append([], 1).  Without this check such calls will have undefined
+// behaviour (usually segfault) if the first argument is the wrong type.
+#ifndef MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG
+#define MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG (1)
+#endif
+
 /*****************************************************************************/
 /* Fine control over Python builtins, classes, modules, etc                  */
 
@@ -451,6 +478,11 @@ typedef double mp_float_t;
 // the "range" builtin type. Rarely used, and costs ~60 bytes (x86).
 #ifndef MICROPY_PY_BUILTINS_RANGE_ATTRS
 #define MICROPY_PY_BUILTINS_RANGE_ATTRS (1)
+#endif
+
+// Whether to support timeout exceptions (like socket.timeout)
+#ifndef MICROPY_PY_BUILTINS_TIMEOUTERROR
+#define MICROPY_PY_BUILTINS_TIMEOUTERROR (0)
 #endif
 
 // Whether to support complete set of special methods

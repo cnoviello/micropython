@@ -104,18 +104,6 @@ void mp_deinit(void) {
 #endif
 }
 
-mp_obj_t mp_load_const_str(qstr qst) {
-    DEBUG_OP_printf("load '%s'\n", qstr_str(qst));
-    return MP_OBJ_NEW_QSTR(qst);
-}
-
-mp_obj_t mp_load_const_bytes(qstr qst) {
-    DEBUG_OP_printf("load b'%s'\n", qstr_str(qst));
-    mp_uint_t len;
-    const byte *data = qstr_data(qst, &len);
-    return mp_obj_new_bytes(data, len);
-}
-
 mp_obj_t mp_load_name(qstr qst) {
     // logic: search locals, globals, builtins
     DEBUG_OP_printf("load name %s\n", qstr_str(qst));
@@ -887,6 +875,51 @@ mp_obj_t mp_load_attr(mp_obj_t base, qstr attr) {
     }
 }
 
+#if MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG
+
+// The following "checked fun" type is local to the mp_convert_member_lookup
+// function, and serves to check that the first argument to a builtin function
+// has the correct type.
+
+typedef struct _mp_obj_checked_fun_t {
+    mp_obj_base_t base;
+    const mp_obj_type_t *type;
+    mp_obj_t fun;
+} mp_obj_checked_fun_t;
+
+STATIC mp_obj_t checked_fun_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args) {
+    mp_obj_checked_fun_t *self = self_in;
+    if (n_args > 0) {
+        const mp_obj_type_t *arg0_type = mp_obj_get_type(args[0]);
+        if (arg0_type != self->type) {
+            if (MICROPY_ERROR_REPORTING != MICROPY_ERROR_REPORTING_DETAILED) {
+                nlr_raise(mp_obj_new_exception_msg(&mp_type_TypeError,
+                    "argument has wrong type"));
+            } else {
+                nlr_raise(mp_obj_new_exception_msg_varg(&mp_type_TypeError,
+                    "argument should be a '%q' not a '%q'", self->type->name, arg0_type->name));
+            }
+        }
+    }
+    return mp_call_function_n_kw(self->fun, n_args, n_kw, args);
+}
+
+STATIC const mp_obj_type_t mp_type_checked_fun = {
+    { &mp_type_type },
+    .name = MP_QSTR_function,
+    .call = checked_fun_call,
+};
+
+STATIC mp_obj_t mp_obj_new_checked_fun(const mp_obj_type_t *type, mp_obj_t fun) {
+    mp_obj_checked_fun_t *o = m_new_obj(mp_obj_checked_fun_t);
+    o->base.type = &mp_type_checked_fun;
+    o->type = type;
+    o->fun = fun;
+    return o;
+}
+
+#endif // MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG
+
 // Given a member that was extracted from an instance, convert it correctly
 // and put the result in the dest[] array for a possible method call.
 // Conversion means dealing with static/class methods, callables, and values.
@@ -903,9 +936,18 @@ void mp_convert_member_lookup(mp_obj_t self, const mp_obj_type_t *type, mp_obj_t
         // Don't try to bind types (even though they're callable)
         dest[0] = member;
     } else if (mp_obj_is_callable(member)) {
-        // return a bound method, with self being this object
-        dest[0] = member;
-        dest[1] = self;
+        #if MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG
+        if (self == MP_OBJ_NULL && mp_obj_get_type(member) == &mp_type_fun_builtin) {
+            // we extracted a builtin method without a first argument, so we must
+            // wrap this function in a type checker
+            dest[0] = mp_obj_new_checked_fun(type, member);
+        } else
+        #endif
+        {
+            // return a bound method, with self being this object
+            dest[0] = member;
+            dest[1] = self;
+        }
     } else {
         // class member is a value, so just return that value
         dest[0] = member;
@@ -1177,7 +1219,7 @@ mp_obj_t mp_make_raise_obj(mp_obj_t o) {
 }
 
 mp_obj_t mp_import_name(qstr name, mp_obj_t fromlist, mp_obj_t level) {
-    DEBUG_printf("import name %s\n", qstr_str(name));
+    DEBUG_printf("import name '%s' level=%d\n", qstr_str(name), MP_OBJ_SMALL_INT_VALUE(level));
 
     // build args array
     mp_obj_t args[5];

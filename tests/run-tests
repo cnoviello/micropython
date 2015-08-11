@@ -37,14 +37,43 @@ def run_micropython(pyb, args, test_file):
             with open(test_file, 'rb') as f:
                 line = f.readline()
                 if line.startswith(b'# cmdline:'):
-                    args += line[10:].strip().split()
+                    # subprocess.check_output on Windows only accepts strings, not bytes
+                    args += [str(c, 'utf-8') for c in line[10:].strip().split()]
 
             # run the test, possibly with redirected input
             try:
                 if test_file.startswith('cmdline/repl_'):
-                    f = open(test_file, 'rb')
-                    output_mupy = subprocess.check_output(args, stdin=f)
-                    f.close()
+                    # Need to use a PTY to test command line editing
+                    try:
+                        import pty
+                    except ImportError:
+                        # in case pty module is not available, like on Windows
+                        return b'SKIP\n'
+                    import select
+
+                    def get():
+                        rv = b''
+                        while True:
+                            ready = select.select([master], [], [], 0.02)
+                            if ready[0] == [master]:
+                                rv += os.read(master, 1024)
+                            else:
+                                return rv
+
+                    def send_get(what):
+                        os.write(master, what)
+                        return get()
+
+                    with open(test_file, 'rb') as f:
+                        # instead of: output_mupy = subprocess.check_output(args, stdin=f)
+                        master, slave = pty.openpty()
+                        p = subprocess.Popen(args, stdin=slave, stdout=slave,
+                                             stderr=subprocess.STDOUT, bufsize=0)
+                        banner = get()
+                        output_mupy = banner + b''.join(send_get(line) for line in f)
+                        p.kill()
+                        os.close(master)
+                        os.close(slave)
                 else:
                     output_mupy = subprocess.check_output(args + [test_file])
             except subprocess.CalledProcessError:
@@ -64,6 +93,9 @@ def run_micropython(pyb, args, test_file):
                         cs.append('\\' + c)
                     else:
                         cs.append(c)
+                # accept carriage-return(s) before final newline
+                if cs[-1] == '\n':
+                    cs[-1] = '\r*\n'
                 return bytes(''.join(cs), 'utf8')
 
             # convert parts of the output that are not stable across runs
@@ -96,6 +128,9 @@ def run_micropython(pyb, args, test_file):
                     # a regex
                     if lines_exp[i][1].match(lines_mupy[i_mupy]):
                         lines_mupy[i_mupy] = lines_exp[i][0]
+                    else:
+                        #print("don't match: %r %s" % (lines_exp[i][1], lines_mupy[i_mupy])) # DEBUG
+                        pass
                     i_mupy += 1
                 if i_mupy >= len(lines_mupy):
                     break
@@ -133,9 +168,11 @@ def run_tests(pyb, tests, args):
     if native == b'CRASH':
         skip_native = True
 
-    # These tests no longer work; TODO change them or remove them
-    skip_tests.add('cmdline/repl_basic.py')
-    skip_tests.add('cmdline/repl_cont.py')
+    # Check if emacs repl is supported, and skip such tests if it's not
+    t = run_micropython(pyb, args, 'cmdline/repl_emacs_check.py')
+    if not 'True' in str(t, 'ascii'):
+        skip_tests.add('cmdline/repl_emacs_check.py')
+        skip_tests.add('cmdline/repl_emacs_keys.py')
 
     # Some tests shouldn't be run under Travis CI
     if os.getenv('TRAVIS') == 'true':
@@ -147,13 +184,24 @@ def run_tests(pyb, tests, args):
         skip_tests.add('float/float2int_doubleprec.py') # requires double precision floating point to work
         skip_tests.add('micropython/meminfo.py') # output is very different to PC output
 
+        if args.target == 'wipy':
+            skip_tests.add('misc/print_exception.py')       # requires error reporting full
+            skip_tests.add('misc/recursion.py')             # requires stack checking enabled
+            skip_tests.add('misc/recursive_data.py')        # requires stack checking enabled
+            skip_tests.add('misc/recursive_iternext.py')    # requires stack checking enabled
+            skip_tests.add('misc/rge_sm.py')                # requires floating point
+            skip_tests.update({'extmod/uctypes_%s.py' % t for t in 'bytearray le native_le ptr_le ptr_native_le sizeof sizeof_native'.split()}) # requires uctypes
+            skip_tests.add('extmod/zlibd_decompress.py')    # requires zlib
+            skip_tests.add('extmod/ujson_dumps_float.py')   # requires floating point
+            skip_tests.add('extmod/ujson_loads_float.py')   # requires floating point
+
     # Some tests are known to fail on 64-bit machines
     if pyb is None and platform.architecture()[0] == '64bit':
         pass
 
     # Some tests use unsupported features on Windows
     if os.name == 'nt':
-        skip_tests.add('import\\import_file.py') #works but CPython prints forward slashes
+        skip_tests.add('import/import_file.py') # works but CPython prints forward slashes
 
     # Some tests are known to fail with native emitter
     # Remove them from the below when they work
@@ -178,6 +226,7 @@ def run_tests(pyb, tests, args):
         skip_tests.add('misc/sys_exc_info.py') # sys.exc_info() is not supported for native
 
     for test_file in tests:
+        test_file = test_file.replace('\\', '/')
         test_basename = os.path.basename(test_file)
         test_name = os.path.splitext(test_basename)[0]
         is_native = test_name.startswith("native_") or test_name.startswith("viper_")
@@ -254,29 +303,37 @@ def run_tests(pyb, tests, args):
 
 def main():
     cmd_parser = argparse.ArgumentParser(description='Run tests for Micro Python.')
-    cmd_parser.add_argument('--pyboard', action='store_true', help='run the tests on the pyboard')
-    cmd_parser.add_argument('--device', default='/dev/ttyACM0', help='the serial device of the pyboard')
+    cmd_parser.add_argument('--target', default='unix', help='the target platform')
+    cmd_parser.add_argument('--device', default='/dev/ttyACM0', help='the serial device or the IP address of the pyboard')
+    cmd_parser.add_argument('-b', '--baudrate', default=115200, help='the baud rate of the serial device')
+    cmd_parser.add_argument('-u', '--user', default='micro', help='the telnet login username')
+    cmd_parser.add_argument('-p', '--password', default='python', help='the telnet login password')
     cmd_parser.add_argument('-d', '--test-dirs', nargs='*', help='input test directories (if no files given)')
     cmd_parser.add_argument('--write-exp', action='store_true', help='save .exp files to run tests w/o CPython')
     cmd_parser.add_argument('--emit', default='bytecode', help='Micro Python emitter to use (bytecode or native)')
     cmd_parser.add_argument('files', nargs='*', help='input test files')
     args = cmd_parser.parse_args()
 
-    if args.pyboard:
+    if args.target == 'pyboard' or args.target == 'wipy':
         import pyboard
-        pyb = pyboard.Pyboard(args.device)
+        pyb = pyboard.Pyboard(args.device, args.baudrate, args.user, args.password)
         pyb.enter_raw_repl()
-    else:
+    elif args.target == 'unix':
         pyb = None
+    else:
+        raise ValueError('target must be either unix, pyboard or wipy')
 
     if len(args.files) == 0:
         if args.test_dirs is None:
-            if pyb is None:
-                # run PC tests
-                test_dirs = ('basics', 'micropython', 'float', 'import', 'io', 'misc', 'unicode', 'extmod', 'unix', 'cmdline')
-            else:
+            if args.target == 'pyboard':
                 # run pyboard tests
                 test_dirs = ('basics', 'micropython', 'float', 'misc', 'extmod', 'pyb', 'pybnative', 'inlineasm')
+            elif args.target == 'wipy':
+                # run WiPy tests
+                test_dirs = ('basics', 'micropython', 'misc', 'extmod')
+            else:
+                # run PC tests
+                test_dirs = ('basics', 'micropython', 'float', 'import', 'io', 'misc', 'unicode', 'extmod', 'unix', 'cmdline')
         else:
             # run tests from these directories
             test_dirs = args.test_dirs

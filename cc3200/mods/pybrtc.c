@@ -25,7 +25,7 @@
  * THE SOFTWARE.
  */
 
-#include <stdio.h>
+#include <std.h>
 
 #include "py/mpconfig.h"
 #include MICROPY_HAL_H
@@ -40,6 +40,9 @@
 #include "pybsleep.h"
 #include "mpcallback.h"
 #include "timeutils.h"
+#include "simplelink.h"
+#include "modnetwork.h"
+#include "modwlan.h"
 
 /// \moduleref pyb
 /// \class RTC - real time clock
@@ -91,6 +94,14 @@ void pybrtc_init(void) {
         // Now set the RTC calendar seconds
         MAP_PRCMRTCSet(seconds, 0);
     }
+}
+
+uint32_t pybrtc_get_seconds (void) {
+    uint32_t seconds;
+    uint16_t mseconds;
+
+    MAP_PRCMRTCGet(&seconds, &mseconds);
+    return seconds;
 }
 
 void pyb_rtc_callback_disable (mp_obj_t self_in) {
@@ -177,7 +188,7 @@ mp_obj_t pyb_rtc_datetime(mp_uint_t n_args, const mp_obj_t *args) {
         tm.tm_year = mp_obj_get_int(items[0]);
         tm.tm_mon = mp_obj_get_int(items[1]);
         tm.tm_mday = mp_obj_get_int(items[2]);
-        // Skip the weekday
+        // skip the weekday
         tm.tm_hour = mp_obj_get_int(items[4]);
         tm.tm_min = mp_obj_get_int(items[5]);
         tm.tm_sec = mp_obj_get_int(items[6]);
@@ -187,6 +198,8 @@ mp_obj_t pyb_rtc_datetime(mp_uint_t n_args, const mp_obj_t *args) {
         mseconds = RTC_U16MS_CYCLES(mseconds);
         MAP_PRCMRTCSet(seconds, mseconds);
 
+        // set WLAN time and date, this is needed to verify certificates
+        wlan_set_current_time(seconds);
         return mp_const_none;
     }
 }

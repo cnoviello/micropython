@@ -27,7 +27,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "stm32f4xx_hal.h"
+#include STM32_HAL_H
 
 #include "py/mpstate.h"
 #include "py/nlr.h"
@@ -74,6 +74,14 @@ STATIC NORETURN mp_obj_t pyb_bootloader(void) {
     HAL_RCC_DeInit();
     HAL_DeInit();
 
+#if defined(MCU_SERIES_F7)
+    // arm-none-eabi-gcc 4.9.0 does not correctly inline this
+    // MSP function, so we write it out explicitly here.
+    //__set_MSP(*((uint32_t*) 0x1FF00000));
+    __ASM volatile ("movw r3, #0x0000\nmovt r3, #0x1FF0\nldr r3, [r3, #0]\nMSR msp, r3\n" : : : "r3", "sp");
+
+    ((void (*)(void)) *((uint32_t*) 0x1FF00004))();
+#else
     __HAL_REMAPMEMORY_SYSTEMFLASH();
 
     // arm-none-eabi-gcc 4.9.0 does not correctly inline this
@@ -82,6 +90,7 @@ STATIC NORETURN mp_obj_t pyb_bootloader(void) {
     __ASM volatile ("movs r3, #0\nldr r3, [r3, #0]\nMSR msp, r3\n" : : : "r3", "sp");
 
     ((void (*)(void)) *((uint32_t*) 0x00000004))();
+#endif
 
     while (1);
 }
@@ -453,6 +462,9 @@ MP_DEFINE_CONST_FUN_OBJ_0(pyb_stop_obj, pyb_stop);
 
 /// \function standby()
 STATIC mp_obj_t pyb_standby(void) {
+#if defined(MCU_SERIES_F7)
+    printf("pyb.standby not supported yet\n");
+#else
     // We need to clear the PWR wake-up-flag before entering standby, since
     // the flag may have been set by a previous wake-up event.  Furthermore,
     // we need to disable the wake-up sources while clearing this flag, so
@@ -481,7 +493,7 @@ STATIC mp_obj_t pyb_standby(void) {
     // enter standby mode
     HAL_PWR_EnterSTANDBYMode();
     // we never return; MCU is reset on exit from standby
-
+#endif
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_0(pyb_standby_obj, pyb_standby);

@@ -52,6 +52,7 @@
 #define MICROPY_DEBUG_PRINTERS      (1)
 #define MICROPY_USE_READLINE_HISTORY (1)
 #define MICROPY_HELPER_REPL         (1)
+#define MICROPY_REPL_EMACS_KEYS     (1)
 #define MICROPY_HELPER_LEXER_UNIX   (1)
 #define MICROPY_ENABLE_SOURCE_LINE  (1)
 #define MICROPY_FLOAT_IMPL          (MICROPY_FLOAT_IMPL_DOUBLE)
@@ -72,7 +73,11 @@
 #define MICROPY_PY_ALL_SPECIAL_METHODS (1)
 #define MICROPY_PY_ARRAY_SLICE_ASSIGN (1)
 #define MICROPY_PY_SYS_EXIT         (1)
-#define MICROPY_PY_SYS_PLATFORM     "linux"
+#if defined(__APPLE__) && defined(__MACH__)
+    #define MICROPY_PY_SYS_PLATFORM  "darwin"
+#else
+    #define MICROPY_PY_SYS_PLATFORM  "linux"
+#endif
 #define MICROPY_PY_SYS_MAXSIZE      (1)
 #define MICROPY_PY_SYS_STDFILES     (1)
 #define MICROPY_PY_SYS_EXC_INFO     (1)
@@ -178,6 +183,11 @@ void mp_unix_mark_exec(void);
 #define MP_PLAT_FREE_EXEC(ptr, size) mp_unix_free_exec(ptr, size)
 
 #define MP_PLAT_PRINT_STRN(str, len) fwrite(str, 1, len, stdout)
+
+#ifdef __linux__
+// Can access physical memory using /dev/mem
+#define MICROPY_PLAT_DEV_MEM  (1)
+#endif
 
 extern const struct _mp_obj_fun_builtin_t mp_builtin_input_obj;
 extern const struct _mp_obj_fun_builtin_t mp_builtin_open_obj;

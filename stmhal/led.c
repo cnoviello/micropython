@@ -25,7 +25,7 @@
  */
 
 #include <stdio.h>
-#include <stm32f4xx_hal.h>
+#include STM32_HAL_H
 
 #include "py/nlr.h"
 #include "py/runtime.h"
@@ -33,6 +33,7 @@
 #include "led.h"
 #include "pin.h"
 #include "genhdr/pins.h"
+#include "mphal.h"
 
 #if defined(MICROPY_HW_LED1)
 
@@ -78,6 +79,7 @@ void led_init(void) {
     /* Turn off LEDs and initialize */
     for (int led = 0; led < NUM_LEDS; led++) {
         const pin_obj_t *led_pin = pyb_led_obj[led].led_pin;
+        mp_hal_gpio_clock_enable(led_pin->gpio);
         MICROPY_HW_LED_OFF(led_pin);
         GPIO_InitStructure.Pin = led_pin->pin_mask;
         HAL_GPIO_Init(led_pin->gpio, &GPIO_InitStructure);

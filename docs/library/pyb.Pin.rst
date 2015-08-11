@@ -67,14 +67,14 @@ Usage Model:
 
     Board pins are identified by their string name::
 
-        g = pyb.Pin('GPIO9', af=0, mode=pyb.Pin.IN, type=pyb.Pin.STD, strength=pyb.Pin.S2MA)
+        g = pyb.Pin('GP9', af=0, mode=pyb.Pin.IN, type=pyb.Pin.STD, strength=pyb.Pin.S2MA)
 
     You can also configure the Pin to generate interrupts. For instance::
 
         def pincb(pin):
-            print(pin.info().name)
+            print(pin.name())
 
-        pin_int = pyb.Pin('GPIO10', af=0, mode=Pin.IN, type=pyb.Pin.STD_PD, strength=pyb.Pin.S2MA)
+        pin_int = pyb.Pin('GP10', af=0, mode=Pin.IN, type=pyb.Pin.STD_PD, strength=pyb.Pin.S2MA)
         pin_int.callback (mode=pyb.Pin.INT_RISING, handler=pincb)
         # the callback can be triggered manually
         pin_int.callback()()
@@ -229,10 +229,12 @@ Methods
        will match one of the allowed constants for the mode argument to the init
        function.
     
-    .. method:: pin.name()
-    
-       Get the pin name.
-    
+.. method:: pin.name()
+
+   Get the pin name.
+
+.. only:: port_pyboard
+
     .. method:: pin.names()
     
        Returns the cpu and board names for this pin.
@@ -262,6 +264,11 @@ Methods
         Return a 5-tuple with the configuration of the pin:
         ``(name, alternate-function, mode, type, strength)``
 
+        .. warning:: 
+            This method cannot be called within a callback (interrupt-context)
+            because it needs to allocate memory to return the tuple and memory
+            allocations are disabled while interrupts are being serviced.
+
     .. method:: pin.callback(\*, mode, priority=1, handler=None, wakes=pyb.Sleep.ACTIVE)
 
         Create a callback to be triggered when the input level at the pin changes.
@@ -281,12 +288,12 @@ Methods
               board. Please note:
 
               - If ``wakes=pyb.Sleep.ACTIVE`` any pin can wake the board.
-              - If ``wakes=pyb.Sleep.SUSPENDED`` pins ``GPIO2``, ``GPIO4``, ``GPIO10``, 
-                ``GPIO11``, GPIO17`` or ``GPIO24`` can wake the board. Note that only 1
+              - If ``wakes=pyb.Sleep.SUSPENDED`` pins ``GP2``, ``GP4``, ``GP10``, 
+                ``GP11``, GP17`` or ``GP24`` can wake the board. Note that only 1
                 of this pins can be enabled as a wake source at the same time, so, only
                 the last enabled pin as a ``pyb.Sleep.SUSPENDED`` wake source will have effect.
-              - If ``wakes=pyb.Sleep.SUSPENDED`` pins ``GPIO2``, ``GPIO4``, ``GPIO10``, 
-                ``GPIO11``, ``GPIO17`` and ``GPIO24`` can wake the board. In this case all of the
+              - If ``wakes=pyb.Sleep.SUSPENDED`` pins ``GP2``, ``GP4``, ``GP10``, 
+                ``GP11``, ``GP17`` and ``GP24`` can wake the board. In this case all of the
                 6 pins can be enabled as a ``pyb.Sleep.HIBERNATE`` wake source at the same time.
               - Values can be ORed to make a pin generate interrupts in more than one power
                 mode.

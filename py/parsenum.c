@@ -36,7 +36,8 @@
 #endif
 
 STATIC NORETURN void raise_exc(mp_obj_t exc, mp_lexer_t *lex) {
-    // if lex!=NULL then the parser called us and we need to make a SyntaxError with traceback
+    // if lex!=NULL then the parser called us and we need to convert the
+    // exception's type from ValueError to SyntaxError and add traceback info
     if (lex != NULL) {
         ((mp_obj_base_t*)exc)->type = &mp_type_SyntaxError;
         mp_obj_exception_add_traceback(exc, lex->source_name, lex->tok_line, MP_QSTR_NULL);
@@ -142,9 +143,8 @@ overflow:
     }
 
 value_error:
-    // if lex!=NULL then the parser called us and we need to make a SyntaxError with traceback
     if (MICROPY_ERROR_REPORTING == MICROPY_ERROR_REPORTING_TERSE) {
-        mp_obj_t exc = mp_obj_new_exception_msg(&mp_type_SyntaxError,
+        mp_obj_t exc = mp_obj_new_exception_msg(&mp_type_ValueError,
             "invalid syntax for integer");
         raise_exc(exc, lex);
     } else {

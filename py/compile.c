@@ -81,8 +81,8 @@ typedef struct _compiler_t {
     uint8_t have_star;
 
     // try to keep compiler clean from nlr
-    // this is set to an exception object if we have a compile error
-    mp_obj_t compile_error;
+    mp_obj_t compile_error; // set to an exception object if there's an error
+    mp_uint_t compile_error_line; // set to best guess of line of error
 
     uint next_label;
 
@@ -108,16 +108,19 @@ typedef struct _compiler_t {
     #endif
 } compiler_t;
 
-STATIC void compile_syntax_error(compiler_t *comp, mp_parse_node_t pn, const char *msg) {
-    mp_obj_t exc = mp_obj_new_exception_msg(&mp_type_SyntaxError, msg);
-    // we don't have a 'block' name, so just pass the NULL qstr to indicate this
-    if (MP_PARSE_NODE_IS_STRUCT(pn)) {
-        mp_obj_exception_add_traceback(exc, comp->source_file, (mp_uint_t)((mp_parse_node_struct_t*)pn)->source_line, comp->scope_cur->simple_name);
-    } else {
-        // we don't have a line number, so just pass 0
-        mp_obj_exception_add_traceback(exc, comp->source_file, 0, comp->scope_cur->simple_name);
+STATIC void compile_error_set_line(compiler_t *comp, mp_parse_node_t pn) {
+    // if the line of the error is unknown then try to update it from the pn
+    if (comp->compile_error_line == 0 && MP_PARSE_NODE_IS_STRUCT(pn)) {
+        comp->compile_error_line = (mp_uint_t)((mp_parse_node_struct_t*)pn)->source_line;
     }
-    comp->compile_error = exc;
+}
+
+STATIC void compile_syntax_error(compiler_t *comp, mp_parse_node_t pn, const char *msg) {
+    // only register the error if there has been no other error
+    if (comp->compile_error == MP_OBJ_NULL) {
+        comp->compile_error = mp_obj_new_exception_msg(&mp_type_SyntaxError, msg);
+        compile_error_set_line(comp, pn);
+    }
 }
 
 #if MICROPY_COMP_MODULE_CONST
@@ -417,6 +420,11 @@ STATIC void compile_generic_all_nodes(compiler_t *comp, mp_parse_node_struct_t *
     int num_nodes = MP_PARSE_NODE_STRUCT_NUM_NODES(pns);
     for (int i = 0; i < num_nodes; i++) {
         compile_node(comp, pns->nodes[i]);
+        if (comp->compile_error != MP_OBJ_NULL) {
+            // add line info for the error in case it didn't have a line number
+            compile_error_set_line(comp, pns->nodes[i]);
+            return;
+        }
     }
 }
 
@@ -1078,7 +1086,7 @@ STATIC void compile_funcdef_param(compiler_t *comp, mp_parse_node_t pn) {
             if (comp->have_star) {
                 comp->num_dict_params += 1;
 #if MICROPY_EMIT_CPYTHON
-                EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pn_id), false);
+                EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pn_id));
                 compile_node(comp, pn_equal);
 #else
                 // in Micro Python we put the default dict parameters into a dictionary using the bytecode
@@ -1096,7 +1104,7 @@ STATIC void compile_funcdef_param(compiler_t *comp, mp_parse_node_t pn) {
 
                 // compile value then key, then store it to the dict
                 compile_node(comp, pn_equal);
-                EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pn_id), false);
+                EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pn_id));
                 EMIT(store_map);
 #endif
             } else {
@@ -1178,7 +1186,7 @@ STATIC qstr compile_classdef_helper(compiler_t *comp, mp_parse_node_struct_t *pn
     close_over_variables_etc(comp, cscope, 0, 0);
 
     // get its name
-    EMIT_ARG(load_const_str, cscope->simple_name, false);
+    EMIT_ARG(load_const_str, cscope->simple_name);
 
     // nodes[1] has parent classes, if any
     // empty parenthesis (eg class C():) gets here as an empty PN_classdef_2 and needs special handling
@@ -1553,7 +1561,7 @@ STATIC void compile_import_from(compiler_t *comp, mp_parse_node_struct_t *pns) {
 #if MICROPY_EMIT_CPYTHON
         EMIT_ARG(load_const_verbatim_strn, "('*',)", 6);
 #else
-        EMIT_ARG(load_const_str, MP_QSTR__star_, false);
+        EMIT_ARG(load_const_str, MP_QSTR__star_);
         EMIT_ARG(build_tuple, 1);
 #endif
 
@@ -1597,7 +1605,7 @@ STATIC void compile_import_from(compiler_t *comp, mp_parse_node_struct_t *pns) {
             assert(MP_PARSE_NODE_IS_STRUCT_KIND(pn_nodes[i], PN_import_as_name));
             mp_parse_node_struct_t *pns3 = (mp_parse_node_struct_t*)pn_nodes[i];
             qstr id2 = MP_PARSE_NODE_LEAF_ARG(pns3->nodes[0]); // should be id
-            EMIT_ARG(load_const_str, id2, false);
+            EMIT_ARG(load_const_str, id2);
         }
         EMIT_ARG(build_tuple, n);
 #endif
@@ -2531,7 +2539,7 @@ STATIC void compile_trailer_paren_helper(compiler_t *comp, mp_parse_node_t pn_ar
                         compile_syntax_error(comp, (mp_parse_node_t)pns_arg, "LHS of keyword arg must be an id");
                         return;
                     }
-                    EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pns_arg->nodes[0]), false);
+                    EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pns_arg->nodes[0]));
                     compile_node(comp, pns2->nodes[0]);
                     n_keyword += 1;
                 } else {
@@ -2979,8 +2987,17 @@ STATIC void compile_node(compiler_t *comp, mp_parse_node_t pn) {
         mp_uint_t arg = MP_PARSE_NODE_LEAF_ARG(pn);
         switch (MP_PARSE_NODE_LEAF_KIND(pn)) {
             case MP_PARSE_NODE_ID: compile_load_id(comp, arg); break;
-            case MP_PARSE_NODE_STRING: EMIT_ARG(load_const_str, arg, false); break;
-            case MP_PARSE_NODE_BYTES: EMIT_ARG(load_const_str, arg, true); break;
+            case MP_PARSE_NODE_STRING: EMIT_ARG(load_const_str, arg); break;
+            case MP_PARSE_NODE_BYTES:
+                // only create and load the actual bytes object on the last pass
+                if (comp->pass != MP_PASS_EMIT) {
+                    EMIT_ARG(load_const_obj, mp_const_none);
+                } else {
+                    mp_uint_t len;
+                    const byte *data = qstr_data(arg, &len);
+                    EMIT_ARG(load_const_obj, mp_obj_new_bytes(data, len));
+                }
+                break;
             case MP_PARSE_NODE_TOKEN: default:
                 if (arg == MP_TOKEN_NEWLINE) {
                     // this can occur when file_input lets through a NEWLINE (eg if file starts with a newline)
@@ -3367,7 +3384,7 @@ STATIC void compile_scope(compiler_t *comp, scope_t *scope, pass_kind_t pass) {
 
         compile_load_id(comp, MP_QSTR___name__);
         compile_store_id(comp, MP_QSTR___module__);
-        EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pns->nodes[0]), false); // 0 is class name
+        EMIT_ARG(load_const_str, MP_PARSE_NODE_LEAF_ARG(pns->nodes[0])); // 0 is class name
         compile_store_id(comp, MP_QSTR___qualname__);
 
         check_for_doc_string(comp, pns->nodes[2]);
@@ -3522,9 +3539,9 @@ STATIC void compile_scope_inline_asm(compiler_t *comp, scope_t *scope, pass_kind
     }
 
     if (comp->compile_error != MP_OBJ_NULL) {
-        // inline assembler had an error; add traceback to its exception
+        // inline assembler had an error; set line for its exception
     inline_asm_error:
-        mp_obj_exception_add_traceback(comp->compile_error, comp->source_file, (mp_uint_t)pns->source_line, comp->scope_cur->simple_name);
+        comp->compile_error_line = pns->source_line;
     }
 }
 #endif
@@ -3810,6 +3827,15 @@ mp_obj_t mp_compile(mp_parse_node_t pn, qstr source_file, uint emit_opt, bool is
                 compile_scope(comp, s, MP_PASS_EMIT);
             }
         }
+    }
+
+    if (comp->compile_error != MP_OBJ_NULL) {
+        // if there is no line number for the error then use the line
+        // number for the start of this scope
+        compile_error_set_line(comp, comp->scope_cur->pn);
+        // add a traceback to the exception using relevant source info
+        mp_obj_exception_add_traceback(comp->compile_error, comp->source_file,
+            comp->compile_error_line, comp->scope_cur->simple_name);
     }
 
     // free the emitters

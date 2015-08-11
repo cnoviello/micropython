@@ -48,7 +48,8 @@
 #define MICROPY_FLOAT_IMPL                          (MICROPY_FLOAT_IMPL_NONE)
 #define MICROPY_OPT_COMPUTED_GOTO                   (0)
 #define MICROPY_OPT_CACHE_MAP_LOOKUP_IN_BYTECODE    (0)
-#define MICROPY_CPYTHON_COMPAT                      (0)
+#define MICROPY_CPYTHON_COMPAT                      (1)
+#define MICROPY_QSTR_BYTES_IN_HASH                  (1)
 
 /* Enable FatFS LFNs
     0: Disable LFN feature.
@@ -62,14 +63,15 @@
 #define MICROPY_MODULE_WEAK_LINKS                   (1)
 #define MICROPY_CAN_OVERRIDE_BUILTINS               (1)
 #define MICROPY_PY_BUILTINS_STR_UNICODE             (1)
-#define MICROPY_PY_BUILTINS_STR_SPLITLINES          (0)
+#define MICROPY_PY_BUILTINS_STR_SPLITLINES          (1)
 #define MICROPY_PY_BUILTINS_MEMORYVIEW              (1)
 #define MICROPY_PY_BUILTINS_FROZENSET               (1)
 #define MICROPY_PY_BUILTINS_EXECFILE                (1)
+#define MICROPY_PY_BUILTINS_TIMEOUTERROR            (1)
 #define MICROPY_PY_MICROPYTHON_MEM_INFO             (0)
 #define MICROPY_PY_ARRAY_SLICE_ASSIGN               (1)
-#define MICROPY_PY_COLLECTIONS_ORDEREDDICT          (0)
-#define MICROPY_PY_SYS_MAXSIZE                      (0)
+#define MICROPY_PY_COLLECTIONS_ORDEREDDICT          (1)
+#define MICROPY_PY_SYS_MAXSIZE                      (1)
 #define MICROPY_PY_SYS_EXIT                         (1)
 #define MICROPY_PY_SYS_STDFILES                     (1)
 #define MICROPY_PY_CMATH                            (0)
@@ -107,6 +109,7 @@ extern const struct _mp_obj_module_t mp_module_usocket;
 extern const struct _mp_obj_module_t mp_module_network;
 extern const struct _mp_obj_module_t mp_module_uhashlib;
 extern const struct _mp_obj_module_t mp_module_ubinascii;
+extern const struct _mp_obj_module_t mp_module_ussl;
 
 #define MICROPY_PORT_BUILTIN_MODULES \
     { MP_OBJ_NEW_QSTR(MP_QSTR_pyb),         (mp_obj_t)&pyb_module },          \
@@ -117,8 +120,10 @@ extern const struct _mp_obj_module_t mp_module_ubinascii;
     { MP_OBJ_NEW_QSTR(MP_QSTR_network),     (mp_obj_t)&mp_module_network },   \
     { MP_OBJ_NEW_QSTR(MP_QSTR_uhashlib),    (mp_obj_t)&mp_module_uhashlib },  \
     { MP_OBJ_NEW_QSTR(MP_QSTR_ubinascii),   (mp_obj_t)&mp_module_ubinascii }, \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_ussl),        (mp_obj_t)&mp_module_ussl },      \
 
 #define MICROPY_PORT_BUILTIN_MODULE_WEAK_LINKS \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_struct),      (mp_obj_t)&mp_module_ustruct },   \
     { MP_OBJ_NEW_QSTR(MP_QSTR_re),          (mp_obj_t)&mp_module_ure },       \
     { MP_OBJ_NEW_QSTR(MP_QSTR_json),        (mp_obj_t)&mp_module_ujson },     \
     { MP_OBJ_NEW_QSTR(MP_QSTR_heapq),       (mp_obj_t)&mp_module_uheapq },    \
@@ -128,6 +133,7 @@ extern const struct _mp_obj_module_t mp_module_ubinascii;
     { MP_OBJ_NEW_QSTR(MP_QSTR_socket),      (mp_obj_t)&mp_module_usocket },   \
     { MP_OBJ_NEW_QSTR(MP_QSTR_hashlib),     (mp_obj_t)&mp_module_uhashlib },  \
     { MP_OBJ_NEW_QSTR(MP_QSTR_binascii),    (mp_obj_t)&mp_module_ubinascii }, \
+    { MP_OBJ_NEW_QSTR(MP_QSTR_ssl),         (mp_obj_t)&mp_module_ussl },      \
 
 // extra constants
 #define MICROPY_PORT_CONSTANTS \

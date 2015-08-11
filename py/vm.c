@@ -205,15 +205,9 @@ dispatch_loop:
                     DISPATCH();
                 }
 
-                ENTRY(MP_BC_LOAD_CONST_BYTES): {
-                    DECODE_QSTR;
-                    PUSH(mp_load_const_bytes(qst));
-                    DISPATCH();
-                }
-
                 ENTRY(MP_BC_LOAD_CONST_STRING): {
                     DECODE_QSTR;
-                    PUSH(mp_load_const_str(qst));
+                    PUSH(MP_OBJ_NEW_QSTR(qst));
                     DISPATCH();
                 }
 
